@@ -35,6 +35,7 @@ type Frame = {
   seconds?: number
   when?: string
   servers?: Array<string | { name?: string }>
+  linked?: boolean | null
 }
 
 /** Every question gets an id so its answer can be told from anyone else's. */
@@ -98,6 +99,13 @@ export function watchBlades(fn: (blade: Blade) => void) {
 let onUi: ((op: string, args: any) => void) | null = null
 export function watchUi(fn: (op: string, args: any) => void) {
   onUi = fn
+}
+
+/** God's Eye View's link state: pushed once on connect and on every change,
+ *  so the WORLD VIEW light never has to poll. null means no world view. */
+let onWorld: ((linked: boolean | null) => void) | null = null
+export function watchWorld(fn: (linked: boolean | null) => void) {
+  onWorld = fn
 }
 
 /**
@@ -207,6 +215,8 @@ function dispatch(ws: WebSocket) {
       // A `ui` frame with no args is normal — reset and clear take none — so an
       // absent args object is an empty one, not a reason to drop the command.
       onUi?.(msg.op, (msg.args ?? {}) as Record<string, unknown>)
+    } else if (msg.type === 'world') {
+      onWorld?.(typeof msg.linked === 'boolean' ? msg.linked : null)
     }
   })
 }

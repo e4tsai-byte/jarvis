@@ -159,6 +159,7 @@ export function Hud({ onType }: { onType: (text: string) => void }) {
   const bootNote = useStore((s) => s.bootNote)
   const gestures = useStore((s) => s.gestures)
   const looking = useStore((s) => s.looking)
+  const world = useStore((s) => s.world)
   const ui = useStore((s) => s.ui)
 
   // accentFor folds JARVIS's overrides in over the phase colour, so one
@@ -223,6 +224,12 @@ export function Hud({ onType }: { onType: (text: string) => void }) {
             <span className="tick" />
             Web
           </div>
+          {world !== null && (
+            <div className={`rail-item${world ? '' : ' dim'}`}>
+              <span className="tick" />
+              World view{world ? '' : ' · offline'}
+            </div>
+          )}
         </aside>
       )}
 

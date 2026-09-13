@@ -69,6 +69,11 @@ export function watchUi(fn: (op: string, args: any) => void): void {
   if (usingBridge) bridge.watchUi(fn)
 }
 
+/** The WORLD VIEW light. Bridge only: God's Eye View links into the bridge. */
+export function watchWorld(fn: (linked: boolean | null) => void): void {
+  if (usingBridge) bridge.watchWorld(fn)
+}
+
 /**
  * The one thing the bridge asks US for.
  *

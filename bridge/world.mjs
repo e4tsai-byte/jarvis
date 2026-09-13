@@ -119,21 +119,35 @@ export function createWorldLink() {
   let socket = null
   let seq = 0
   const waiting = new Map()
+  const listeners = new Set()
+  const emit = (linked) => {
+    for (const fn of listeners) fn(linked)
+  }
 
   return {
+    /** Told true when a page says hello, false when the linked page goes. */
+    onChange(fn) {
+      listeners.add(fn)
+      return () => listeners.delete(fn)
+    },
+
     get connected() {
       return Boolean(socket) && socket.readyState === socket.OPEN
     },
 
     attach(ws) {
-      if (socket && socket !== ws) {
+      // The newcomer is recorded before the old page is closed, so the old
+      // one's close — sync or not — can never be mistaken for the live page
+      // leaving, which would flash the HUD light off mid-handover.
+      const previous = socket
+      socket = ws
+      if (previous && previous !== ws) {
         try {
-          socket.close(4000, 'replaced by a newer world view')
+          previous.close(4000, 'replaced by a newer world view')
         } catch {
           /* already gone */
         }
       }
-      socket = ws
 
       ws.on('message', (raw) => {
         let msg
@@ -144,6 +158,7 @@ export function createWorldLink() {
         }
         if (msg?.type === 'hello') {
           console.log(`[jarvis] world view linked (${String(msg.app ?? 'unknown').slice(0, 40)})`)
+          if (socket === ws) emit(true)
           return
         }
         if ((msg?.type === 'result' || msg?.type === 'look') && typeof msg.id === 'string') {
@@ -155,6 +170,7 @@ export function createWorldLink() {
         if (socket === ws) {
           socket = null
           console.log('[jarvis] world view unlinked')
+          emit(false)
         }
         for (const slot of [...waiting.values()]) {
           if (slot.ws === ws) slot.reject(new Error('the world view was closed'))

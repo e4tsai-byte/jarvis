@@ -228,6 +228,9 @@ type State = {
   /** Set while JARVIS is taking a look, to whatever he said he was looking for.
    *  null when he is not. The camera light is on either way — this says why. */
   looking: string | null
+  /** God's Eye View link state for the WORLD VIEW light. null when the bridge
+   *  has no world view configured, so the light is left out entirely. */
+  world: boolean | null
   /** Transient status line during boot, e.g. the voice model download. */
   bootNote: string
   /** Cards currently on the display, newest last. */
@@ -244,6 +247,7 @@ type State = {
   setVoice: (v: string) => void
   setGestures: (on: boolean) => void
   setLooking: (why: string | null) => void
+  setWorld: (linked: boolean | null) => void
   setBootNote: (n: string) => void
   pushPanel: (p: Panel) => void
   clearPanels: () => void
@@ -281,6 +285,7 @@ export const useStore = create<State>((set) => ({
   voice: '',
   gestures: false,
   looking: null,
+  world: null,
   panels: [],
   blades: [],
   focusedBlade: null,
@@ -291,6 +296,7 @@ export const useStore = create<State>((set) => ({
   setVoice: (voice) => set({ voice }),
   setGestures: (gestures) => set({ gestures }),
   setLooking: (looking) => set({ looking }),
+  setWorld: (world) => set({ world }),
   setBootNote: (bootNote) => set({ bootNote }),
   // Three is as many as fits around the reactor without crowding it. Sticky
   // panels are exempt from the cull — the tool description promises they stay

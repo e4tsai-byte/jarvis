@@ -24,6 +24,7 @@ import {
   watchBlades,
   watchCapture,
   watchUi,
+  watchWorld,
   watchConnection,
   connectedLabels,
   usingBridge,
@@ -466,9 +467,15 @@ export default function App() {
     // In bridge mode the conversation lives in the agent session, which is tied
     // to the socket — so a drop silently wipes his memory while the transcript
     // on screen still shows it. Better to say so than to let him quietly forget.
+    // The WORLD VIEW light. The bridge pushes the link state on connect and on
+    // every change, so a reconnect re-announces it.
+    watchWorld((linked) => store.getState().setWorld(linked))
     watchConnection((state) => {
       if (state === 'lost') {
         store.getState().setError('Bridge connection lost — reconnecting.')
+        // With the bridge gone the link state is unknown: show it offline
+        // until the bridge says otherwise.
+        if (store.getState().world) store.getState().setWorld(false)
       } else if (state === 'reconnected') {
         store
           .getState()

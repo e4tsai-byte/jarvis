@@ -1117,6 +1117,14 @@ wss.on('connection', (socket, req) => {
     if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(msg))
   }
 
+  // The world view's link state, for the HUD light: once now, so a face that
+  // connects late still knows, then on every change. null when this bridge has
+  // no world view at all, so the HUD can leave the light out.
+  send({ type: 'world', linked: WORLD_TOOLS ? worldLink.connected : null })
+  const offWorld = WORLD_TOOLS
+    ? worldLink.onChange((linked) => send({ type: 'world', linked }))
+    : () => {}
+
   /**
    * Which question the agent is currently answering.
    *
@@ -1503,6 +1511,7 @@ wss.on('connection', (socket, req) => {
 
   socket.on('close', () => {
     console.log('[jarvis] client disconnected')
+    offWorld()
     closed = true
     deliver?.(null)
     session.close?.()
