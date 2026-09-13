@@ -21,6 +21,7 @@ import { displayServer } from './panels.mjs'
 import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
+import { createWorldLink, loadWorldTools, worldOriginAllowed, worldServer, GEV_DIR } from './world.mjs'
 import { homedir, tmpdir } from 'node:os'
 import { readFileSync, realpathSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
@@ -286,6 +287,12 @@ function decideTool(name) {
     // and the real gate is the browser's own camera permission plus an
     // indicator the user can see for as long as it is live.
     if (server === 'jarvis_eyes') return true
+
+    // The world view. It steers a globe on the user's own screen — a camera
+    // flight, a layer, a mark on the map — and nothing leaves the machine but
+    // the public-data reads GEV already makes. Named here because the verb
+    // rules would read `set_layer_visibility` as a write.
+    if (server === 'jarvis_world') return true
 
     const tool = mcpToolOf(name)
     if (EFFECTFUL_VERB.test(tool) && !VETO_EXEMPT.has(`${server}__${tool}`)) {
@@ -692,7 +699,9 @@ const handleRequest = async (req, res) => {
     // student with nothing configured still has a working assistant.
     const eleven = Boolean(elevenKey())
     res.writeHead(200, { ...cors, 'content-type': 'application/json' })
-    return res.end(JSON.stringify({ ok: true, tts: eleven, stt: eleven }))
+    return res.end(
+      JSON.stringify({ ok: true, tts: eleven, stt: eleven, world: worldLink.connected }),
+    )
   }
 
   // Serve local image files to the page. Screenshots and generated art land on
@@ -984,6 +993,13 @@ const server = http.createServer((req, res) => {
   })
 })
 
+/**
+ * The world view (bridge/world.mjs): God's Eye View's tools when a checkout of
+ * it is on this machine, and the one link to the page that runs them.
+ */
+const WORLD_TOOLS = await loadWorldTools()
+const worldLink = createWorldLink()
+
 const wss = new WebSocketServer({
   server,
   // The handshake is the only place a page can be turned away, so it happens
@@ -992,6 +1008,13 @@ const wss = new WebSocketServer({
   // 403 would look like the bridge simply isn't running.
   verifyClient: ({ origin, req }, done) => {
     const path = (req.url ?? '/').split('?')[0]
+    // The world view's link is held to GEV's own origin, not the general dev
+    // range: only that page gets to be the thing JARVIS looks through.
+    if (path === '/world') {
+      if (worldOriginAllowed(origin)) return done(true)
+      console.warn(`[jarvis] rejected world view link from origin ${origin ?? '(none)'}`)
+      return done(false, 403, 'Forbidden')
+    }
     if (path !== '/' && path !== '/ws') {
       console.warn(`[jarvis] rejected websocket on path ${path}`)
       return done(false, 403, 'Forbidden')
@@ -1035,6 +1058,13 @@ console.log(
     (ALLOW_NO_ORIGIN ? ' and clients that send no origin' : ''),
 )
 
+console.log(
+  WORLD_TOOLS
+    ? `[jarvis] world view: ${WORLD_TOOLS.length} God's Eye View tools from ${GEV_DIR}` +
+        ' — open http://localhost:4173/?jarvis=1&welcome=0'
+    : `[jarvis] world view unavailable — no God's Eye View checkout at ${GEV_DIR}`,
+)
+
 /**
  * What to tell the browser when a turn ends badly. Plain sentences, because
  * whatever reaches the client is liable to be spoken.
@@ -1047,7 +1077,13 @@ const RESULT_FAILURES = {
   default: 'The turn ended without an answer.',
 }
 
-wss.on('connection', (socket) => {
+wss.on('connection', (socket, req) => {
+  // Not a conversation: the world view only answers requests made from here,
+  // so it never gets an agent session of its own.
+  if ((req?.url ?? '/').split('?')[0] === '/world') {
+    worldLink.attach(socket)
+    return
+  }
   console.log('[jarvis] client connected')
 
   // Answer the HUD straight away rather than making it wait for the agent's
@@ -1222,6 +1258,9 @@ wss.on('connection', (socket) => {
         jarvis_chrome: chromeServer({ allowWrites: ALLOW_WRITES }),
         // The camera, which unlike everything else here has to ask and wait.
         jarvis_eyes: visionServer(ask),
+        // The world view, when a God's Eye View checkout is here. Its link is
+        // shared by every conversation: there is one globe on the screen.
+        ...(WORLD_TOOLS ? { jarvis_world: worldServer(worldLink, WORLD_TOOLS) } : {}),
       },
       // A plain system prompt, not the claude_code preset. The preset is
       // tuned for a coding agent — verbose, file-oriented, and a large chunk
