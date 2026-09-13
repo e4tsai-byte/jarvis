@@ -316,6 +316,20 @@ export default function App() {
     store.getState().setError(message)
   }
 
+  /**
+   * Typed instead of said. The same turn as a spoken one — no wake word, and it
+   * cuts him off if he is mid-answer — it just arrives already transcribed.
+   */
+  const onTyped = (text: string) => {
+    const phase = store.getState().phase
+    if (phase === 'offline' || phase === 'boot') return
+    const said = text.trim()
+    if (!said) return
+    store.getState().setError(null)
+    onSpeechStart()
+    void respond(said)
+  }
+
   // -- power on -------------------------------------------------------------
 
   const powerOn = async () => {
@@ -698,7 +712,7 @@ export default function App() {
   return (
     <>
       <Scene />
-      <Hud />
+      <Hud onType={onTyped} />
       <Boot />
       <Diagnostics />
       <Ignition onStart={() => void powerOn()} />

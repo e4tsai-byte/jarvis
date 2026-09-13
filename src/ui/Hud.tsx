@@ -6,6 +6,7 @@ import { BladeSweep, Blades } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
 import { GestureGuide } from './GestureGuide'
+import { TypeBar } from './TypeBar'
 
 const statusText: Record<Phase, string> = {
   offline: 'OFFLINE',
@@ -146,7 +147,7 @@ function DecodeText({ text }: { text: string }) {
 
 /* --------------------------------------------------------------------- hud */
 
-export function Hud() {
+export function Hud({ onType }: { onType: (text: string) => void }) {
   const phase = useStore((s) => s.phase)
   const caption = useStore((s) => s.caption)
   const turns = useStore((s) => s.turns)
@@ -286,6 +287,10 @@ export function Hud() {
         </div>
       )}
 
+      {/* Before the caption and the suggestions, which it hides while open —
+          the stylesheet steps them aside with a sibling selector. */}
+      <TypeBar onSend={onType} />
+
       <AnimatePresence>
         {caption && (
           <motion.div
@@ -312,7 +317,8 @@ export function Hud() {
 
       <footer className="hud-bottom">
         <span className="hint">
-          say <b>“hey jarvis”</b> · <kbd>Space</kbd> to talk · <kbd>G</kbd> hands
+          say <b>“hey jarvis”</b> · <kbd>Space</kbd> to talk · <kbd>Enter</kbd> to
+          type · <kbd>G</kbd> hands
           {voice && (
             <>
               {' · '}

@@ -306,6 +306,64 @@ body::after {
   text-align: center;
 }
 
+/* Typing to him (TypeBar.tsx). It takes the live caption's spot: you are
+   either typing or talking, so the caption and the idle suggestions step aside
+   while it is open. The centring (x: -50%) is a framer prop, as on .tool-badge. */
+.typebar {
+  position: absolute;
+  left: 50%;
+  bottom: 80px;
+  width: min(560px, 80vw);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 9%, rgba(2, 10, 12, 0.6));
+  backdrop-filter: blur(5px);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 18%, transparent);
+  pointer-events: auto;
+}
+
+.typebar:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 75%, transparent);
+}
+
+.typebar-who {
+  font-size: 8px;
+  letter-spacing: 0.34em;
+  opacity: 0.6;
+}
+
+.typebar-input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  outline: none;
+  color: #fff;
+  caret-color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.typebar-input::placeholder {
+  color: var(--accent);
+  opacity: 0.4;
+}
+
+.typebar-send {
+  opacity: 0.5;
+}
+
+.typebar ~ .caption,
+.typebar ~ .suggest {
+  visibility: hidden;
+}
+
 .error {
   position: absolute;
   left: 50%;
