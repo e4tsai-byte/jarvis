@@ -13,6 +13,9 @@
 import { spawn } from 'node:child_process'
 import process from 'node:process'
 import { cpSync, existsSync, mkdirSync } from 'node:fs'
+import net from 'node:net'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 /**
  * Put MediaPipe's WebAssembly where the page can actually load it.
@@ -118,6 +121,51 @@ run('bridge', 'node', ['bridge/server.mjs'], '36', bridgeEnv)
 // npm is a shell script on most systems; call the vite binary directly so we do
 // not need shell:true (which would break the argument handling above).
 run('face', process.execPath, ['node_modules/vite/bin/vite.js'], '35', {})
+
+/**
+ * --world: God's Eye View's dev server alongside, for JARVIS's world view.
+ *
+ * Optional, so unlike the other two its exit does not take JARVIS down, and it
+ * is skipped when GEV is not checked out or something already serves its port.
+ * PORT is pinned because GEV's config reads it, and ours may already say 5180.
+ */
+const world = process.argv.includes('--world')
+const GEV_DIR = process.env.GEV_DIR ?? join(homedir(), 'Github', 'gods-eye-view')
+const GEV_PORT = 4173
+
+/** `localhost`, not 127.0.0.1: Vite on macOS may listen on IPv6 only. */
+const portInUse = (port) =>
+  new Promise((resolve) => {
+    const probe = net.connect({ port, host: 'localhost' })
+    probe.once('connect', () => {
+      probe.destroy()
+      resolve(true)
+    })
+    probe.once('error', () => resolve(false))
+  })
+
+if (world) {
+  const vite = join(GEV_DIR, 'node_modules', 'vite', 'bin', 'vite.js')
+  if (!existsSync(vite)) {
+    console.log(`  world view: no God's Eye View install at ${GEV_DIR} (npm ci there) — skipping.`)
+  } else if (await portInUse(GEV_PORT)) {
+    console.log(`  world view: something already serves port ${GEV_PORT} — using it.`)
+  } else {
+    const label = paint('world', '33')
+    const child = spawn(process.execPath, [vite, '--port', String(GEV_PORT), '--strictPort'], {
+      cwd: GEV_DIR,
+      env: { ...process.env, PORT: String(GEV_PORT) },
+      shell: false,
+    })
+    child.stdout.on('data', (d) => process.stdout.write(label(d) + '\n'))
+    child.stderr.on('data', (d) => process.stderr.write(label(d) + '\n'))
+    child.on('exit', (code) => {
+      console.log(`\x1b[33mworld\x1b[0m exited (${code}); JARVIS carries on without it.`)
+    })
+    children.push(child)
+  }
+  console.log(`  world view: open http://localhost:${GEV_PORT}/?jarvis=1&welcome=0 beside JARVIS.\n`)
+}
 
 console.log(
   '\nWhen it says the dev server is ready, open the URL it prints in Chrome,\n' +
