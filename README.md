@@ -189,6 +189,31 @@ the bridge (`/img` and `/media`, both SSRF-guarded), so hotlink-blocked news
 thumbnails still appear and the page never beacons your IP to a host the model
 chose.
 
+### JARVIS sees the world
+
+With [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (GEV)
+beside it, JARVIS can steer a live 3D globe — real aircraft, ships, satellites,
+earthquakes, fires and public cameras — and look at it. The bridge loads GEV's
+28 tools from your checkout, plus `world_look`, which hands Claude the current
+frame.
+
+1. Clone the fork with the link on its `jarvis-link` branch
+   (`e4tsai-byte/gods-eye-view`) next to this repo, at `~/Github/gods-eye-view`
+   or wherever `GEV_DIR` points, then `npm ci` in it. GEV needs Node 24.14+ or
+   26.
+2. Start everything with `npm start -- --world`, or run GEV's `npm run dev`
+   yourself.
+3. Open **http://localhost:4173/?jarvis=1&welcome=0** in its own window beside
+   JARVIS. The chip at the top reads **JARVIS LINK · ONLINE** and WORLD VIEW
+   lights up in the SYSTEMS rail. In this mode GEV's own mic is off; JARVIS is
+   the voice.
+4. Ask: *"Take me to Tokyo."* · *"Turn on the flights layer."* · *"How many
+   flights are in view?"* · *"What am I looking at?"*
+
+Keep the GEV window visible. A hidden window renders nothing, and JARVIS will
+say it cannot see rather than describe an old frame. Design notes and what
+testing changed: [docs/GODS-EYE-VIEW-PLAN.md](docs/GODS-EYE-VIEW-PLAN.md).
+
 ---
 
 ## Controls
@@ -197,6 +222,7 @@ chose.
 |---|---|
 | **"Hey Jarvis"** | Wake him |
 | **Space** | Talk without the wake word |
+| **Enter** | Type instead of speaking (Enter sends, Escape closes) |
 | Just speak | Interrupt him mid-sentence (barge-in) |
 | **V** | Cycle the browser voice |
 | **Escape** | Stand down |
@@ -233,6 +259,8 @@ Everything is optional in bridge mode. Frontend settings live in `.env.local`
 | `JARVIS_FILE_ROOTS` | — | Roots the `/file` endpoint may serve from |
 | `JARVIS_VOICE_ID` | — | ElevenLabs voice id |
 | `ELEVENLABS_API_KEY` | — | Optional; enables the ElevenLabs voice + Scribe |
+| `GEV_DIR` | `~/Github/gods-eye-view` | God's Eye View checkout for the world view |
+| `GEV_ORIGIN` | `localhost:4173` | Page origins allowed to hold the world link |
 
 ### Frontend (`.env.local`)
 

@@ -4,10 +4,10 @@
 steer, question, and literally look at — by connecting it to
 [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (GEV).
 
-**Status:** M0–M3 built and verified end to end. GEV fork
-`e4tsai-byte/gods-eye-view`, branch `jarvis-link`, on upstream `79a0f09`;
-JARVIS branch `world-view`. M4 (HUD status, `npm start -- --world`, README)
-not started.
+**Status:** M0–M4 built and verified. GEV fork `e4tsai-byte/gods-eye-view`,
+branch `jarvis-link`, on upstream `79a0f09`; JARVIS branch `world-view`. One
+gap: `npm start -- --world` was tested only with GEV already serving port 4173
+(it reuses it); the path where it starts GEV itself has not been run.
 
 **What testing changed from the plan:**
 - **Frame size.** GEV caps viewport captures at 200 KB for OpenAI's data
