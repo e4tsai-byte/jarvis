@@ -28,6 +28,14 @@ import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
 
+// The bridge otherwise sees only its shell environment. Loading .env.local lets
+// JARVIS_VOICE_ID and ELEVENLABS_API_KEY live beside the VITE_ settings.
+try {
+  process.loadEnvFile(join(import.meta.dirname, '..', '.env.local'))
+} catch {
+  /* no .env.local — every setting is optional */
+}
+
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
 
 /**
