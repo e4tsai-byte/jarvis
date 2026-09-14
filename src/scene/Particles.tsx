@@ -108,6 +108,11 @@ export function Particles({ drive }: { drive: Drive }) {
     const u = mat.current.uniforms
     pts.current.visible = drive.reactor.visible
     u.uIntensity.value = drive.reactor.intensity
+    // Point sprites are sized in pixels, so they ignore the camera's zoom: when
+    // the dash zooms out to fit the orb in its panel, the shell shrinks and
+    // its dots do not, and the cloud turns to snow. Following the zoom part
+    // of the way keeps them fine without losing them.
+    u.uSize.value = 3.4 * Math.sqrt((state.camera as THREE.PerspectiveCamera).zoom)
     u.uTime.value = state.clock.elapsedTime
     u.uLevel.value += (drive.level - u.uLevel.value) * Math.min(1, dt * 6)
     ;(u.uColor.value as THREE.Color).lerp(drive.color, Math.min(1, dt * 3))

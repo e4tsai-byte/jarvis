@@ -4,13 +4,13 @@ import {
   EffectComposer,
   Bloom,
   ChromaticAberration,
-  Vignette,
   Noise,
 } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
 import { Core } from './Core'
 import { Particles } from './Particles'
+import { Field } from './Field'
 import { Orbits } from './Orbits'
 import { useStore, phaseColor, accentFor, type Phase } from '../store'
 
@@ -130,10 +130,11 @@ function Rig() {
     () => ({ key: '', color: new THREE.Color() }),
     [],
   )
+  const framing = useMemo(() => ({ tx: 0, ty: 0, k: 1, placed: false }), [])
 
   useFrame((state, dt) => {
     // Read imperatively rather than subscribing — see the note on Drive.
-    const { phase, level, ui } = useStore.getState()
+    const { phase, level, ui, reactorFrame } = useStore.getState()
 
     // accentFor owns the accent -> palette -> phase resolution order. The scene
     // asking the store for the answer rather than working it out again is what
@@ -174,6 +175,26 @@ function Rig() {
     state.camera.position.x = Math.sin(t * 0.13) * 0.35
     state.camera.position.y = Math.cos(t * 0.17) * 0.22
     state.camera.lookAt(0, 0, 0)
+
+    // Framing. The dash wants the orb in its panel, not in the middle of the
+    // page. Shrinking the whole canvas into the panel shrank the particle
+    // field with it; zooming the camera out and shifting the picture instead
+    // keeps the canvas full screen, so the field can fill JARVIS's half. The
+    // world view docks that same spot as the orb (index.css). Eased, so a
+    // resize settles rather than snaps; placed outright the first time.
+    if (reactorFrame) {
+      if (!framing.placed) Object.assign(framing, reactorFrame, { placed: true })
+      const e = Math.min(1, dt * 6)
+      framing.tx += (reactorFrame.tx - framing.tx) * e
+      framing.ty += (reactorFrame.ty - framing.ty) * e
+      framing.k += (reactorFrame.k - framing.k) * e
+    }
+    const cam = state.camera as THREE.PerspectiveCamera
+    const { width, height } = state.size
+    cam.zoom = framing.k
+    // Moves the picture by (tx, ty); also recomputes the projection, zoom
+    // included.
+    cam.setViewOffset(width, height, -framing.tx, -framing.ty, width, height)
   })
 
   // Nothing in here is lit: both the core and the dust are raw ShaderMaterials,
@@ -185,6 +206,7 @@ function Rig() {
   // subject is one unbroken one.
   return (
     <>
+      <Field drive={drive} />
       <Core drive={drive} />
       <Particles drive={drive} />
       <Orbits />
@@ -193,15 +215,15 @@ function Rig() {
 }
 
 export function Scene() {
-  // Docked as the orb, the reactor is a 140px circle over a live globe: full
-  // retina resolution there is GPU spent on pixels nobody sees.
-  const docked = useStore((s) => s.world !== null && s.layout === 'world')
+  // One device pixel per CSS pixel. The canvas covers the whole viewport, but
+  // what it draws is soft glow and point sprites that bloom blurs anyway —
+  // retina resolution would be four times the fill for no visible edge.
   return (
     <Canvas
       className="scene"
       camera={{ position: [0, 0, 6.2], fov: 45 }}
       gl={{ antialias: true, alpha: true }}
-      dpr={docked ? 1 : [1, 2]}
+      dpr={1}
     >
       <Rig />
       {/*
@@ -236,7 +258,10 @@ export function Scene() {
           modulationOffset={0}
         />
         <Noise opacity={0.035} blendFunction={BlendFunction.OVERLAY} />
-        <Vignette eskil={false} offset={0.22} darkness={0.95} />
+        {/* No vignette. It darkened toward the canvas's edges around the
+            middle of the screen, which suited a full-screen reactor; the orb
+            now sits off to one side with its field meant to reach the edge of
+            JARVIS's half, and the vignette pooled shadow exactly there. */}
       </EffectComposer>
     </Canvas>
   )

@@ -8,46 +8,20 @@ import { watchWorldTool } from '../lib/brain'
  *
  * Two layouts, and the page moves between them on its own:
  *
- *   'world'  — the globe fills the screen and JARVIS docks as an orb top-right,
- *              with the transcript in a card bottom-right.
- *   'jarvis' — JARVIS full screen as ever, the globe in a round scope
- *              bottom-right.
+ *   'dash'  — the dashboard: the globe live and interactive in its panel.
+ *   'world' — the globe fills the screen and JARVIS docks as an orb top-right,
+ *             with the transcript in a card bottom-right.
  *
- * Any world tool brings the world forward. It goes back to JARVIS once a minute
- * has passed with no world tools, no one touching the globe, and JARVIS idle.
- * W, the orb and the scope switch by hand.
+ * Any world tool brings the world forward. It goes back to the dashboard once a
+ * minute has passed with no world tools, no one touching the globe, no layout
+ * switch, and JARVIS idle. W, the expand button and the orb switch by hand.
  *
  * The iframe is mounted once and never moved in the DOM: switching is a
- * transform and a clip on the same element, so GEV keeps its camera, layers
- * and link across every switch instead of reloading.
+ * transform and a crop on the same element (see Dash's measure and index.css),
+ * so GEV keeps its camera, layers and link across every switch.
  */
 
 const IDLE_RETURN_MS = 60_000
-const SCOPE_PX = 240
-const SCOPE_MARGIN = 28
-const ORB_RADIUS_PX = 70
-const ORB_MARGIN = 22
-/** The reactor's ring sits inside this share of the viewport height. */
-const ORB_CLIP_VH = 0.3
-
-type Layout = 'jarvis' | 'world'
-
-/**
- * Where the two circles land, as CSS variables: the scope's scale and offset
- * for the globe, the orb's for the reactor. Pixel geometry lives here rather
- * than in the stylesheet because CSS cannot divide one length by another.
- */
-function place() {
-  const w = window.innerWidth
-  const h = window.innerHeight
-  const root = document.documentElement.style
-  root.setProperty('--scope-scale', String(SCOPE_PX / h))
-  root.setProperty('--scope-x', `${w - SCOPE_MARGIN - SCOPE_PX / 2 - w / 2}px`)
-  root.setProperty('--scope-y', `${h - SCOPE_MARGIN - SCOPE_PX / 2 - h / 2}px`)
-  root.setProperty('--orb-scale', String(ORB_RADIUS_PX / (ORB_CLIP_VH * h)))
-  root.setProperty('--orb-x', `${w - ORB_MARGIN - ORB_RADIUS_PX - w / 2}px`)
-  root.setProperty('--orb-y', `${ORB_MARGIN + ORB_RADIUS_PX - h / 2}px`)
-}
 
 export function WorldView() {
   const world = useStore((s) => s.world)
@@ -65,32 +39,35 @@ export function WorldView() {
     return url.href
   }, [])
 
-  const show = (next: Layout) => {
-    lastWorld.current = Date.now()
-    useStore.getState().setLayout(next)
-  }
+  // Where the orb docks is measured by the dash (Dash.tsx), since it starts
+  // from the reactor's spot in its panel.
 
-  useEffect(() => {
-    place()
-    window.addEventListener('resize', place)
-    return () => window.removeEventListener('resize', place)
-  }, [])
-
-  // The stylesheet keys everything off one attribute on the root, and only
-  // while this bridge has a world view at all.
+  // The stylesheet keys everything off two attributes on the root.
   useEffect(() => {
     const root = document.documentElement
-    if (world === null) delete root.dataset.layout
-    else root.dataset.layout = layout
+    root.dataset.layout = layout
+    root.dataset.world = world ? 'on' : 'off'
   }, [world, layout])
-  useEffect(() => () => void delete document.documentElement.dataset.layout, [])
+  useEffect(
+    () => () => {
+      delete document.documentElement.dataset.layout
+      delete document.documentElement.dataset.world
+    },
+    [],
+  )
+
+  // Tell the globe which view it is in: the bare globe in a panel, or GEV's
+  // full interface on the whole screen.
+  const tellGlobe = () =>
+    frame.current?.contentWindow?.postMessage({ source: 'jarvis', type: 'layout', layout }, gevOrigin)
+  useEffect(tellGlobe, [layout, world, gevOrigin])
 
   // A world tool brings the world forward.
   useEffect(() => {
     watchWorldTool(() => {
       lastWorld.current = Date.now()
       const s = useStore.getState()
-      if (s.world !== null && s.layout !== 'world') s.setLayout('world')
+      if (s.world && s.layout !== 'world') s.setLayout('world')
     })
   }, [])
 
@@ -99,14 +76,14 @@ export function WorldView() {
   useEffect(() => {
     const id = window.setInterval(() => {
       const s = useStore.getState()
-      if (s.world === null || s.layout !== 'world') return
+      if (s.layout !== 'world') return
       const now = Date.now()
       if (s.phase === 'thinking' || s.phase === 'tooling' || s.phase === 'speaking') {
         lastWorld.current = now
         return
       }
-      if (now - Math.max(lastWorld.current, lastActivity.current) > IDLE_RETURN_MS) {
-        s.setLayout('jarvis')
+      if (now - Math.max(lastWorld.current, lastActivity.current, s.layoutAt) > IDLE_RETURN_MS) {
+        s.setLayout('dash')
       }
     }, 3000)
     return () => window.clearInterval(id)
@@ -119,6 +96,16 @@ export function WorldView() {
       if (e.origin !== gevOrigin || e.source !== frame.current?.contentWindow) return
       const m = e.data as { source?: string; type?: string; key?: string; code?: string }
       if (m?.source !== 'gev') return
+      // The globe is listening now: whatever layout was sent before this may
+      // have landed before its listener existed, so send it again. Not
+      // activity — nobody touched anything.
+      if (m.type === 'ready') {
+        frame.current?.contentWindow?.postMessage(
+          { source: 'jarvis', type: 'layout', layout: useStore.getState().layout },
+          gevOrigin,
+        )
+        return
+      }
       lastActivity.current = Date.now()
       // The release matters as much as the press: talking is hold-to-talk,
       // and a Space release that stayed inside the frame would leave the
@@ -146,13 +133,12 @@ export function WorldView() {
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (e.key !== 'w' || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
       const s = useStore.getState()
-      if (s.world === null || s.phase === 'offline' || s.phase === 'boot') return
+      if (!s.world || s.phase === 'offline' || s.phase === 'boot') return
       e.preventDefault()
-      show(s.layout === 'world' ? 'jarvis' : 'world')
+      s.setLayout(s.layout === 'world' ? 'dash' : 'world')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (world === null) return null
@@ -160,22 +146,13 @@ export function WorldView() {
   return (
     <>
       <div className="world-frame">
-        <iframe ref={frame} src={src} title="God's Eye View" />
+        <iframe ref={frame} src={src} title="God's Eye View" onLoad={tellGlobe} />
       </div>
       <button
         type="button"
-        className="world-scope-ring"
-        onClick={() => show('world')}
-        aria-label="Show the world view"
-        tabIndex={layout === 'jarvis' ? 0 : -1}
-      >
-        <span>{world ? 'WORLD' : 'WORLD · OFFLINE'}</span>
-      </button>
-      <button
-        type="button"
         className="world-orb-hit"
-        onClick={() => show('jarvis')}
-        aria-label="Full screen JARVIS"
+        onClick={() => useStore.getState().setLayout('dash')}
+        aria-label="Back to the dashboard"
         tabIndex={layout === 'world' ? 0 : -1}
       />
     </>

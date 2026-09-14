@@ -193,6 +193,41 @@ the bridge (`/img` and `/media`, both SSRF-guarded), so hotlink-blocked news
 thumbnails still appear and the page never beacons your IP to a host the model
 chose.
 
+### The dash
+
+Everything at once, on one screen. JARVIS's half, on the left, is one lit
+field: the reactor's dust and glow fill it and fade into the right-hand column.
+The orb floats at its centre, with its name and status above it and your
+voice as a waveform below. Traces flow out of the orb to every readout, and
+light pulses along them while JARVIS is thinking, using a tool or speaking.
+
+- **Top row** — CPU and memory rings and a minute of network traffic, read by
+  the bridge every two seconds while the dash is showing.
+- **Left** — **Today** and **Inbox**: your next calendar events and your
+  latest unread mail (sender and subject). A background Claude run refreshes
+  them every 30 minutes. It uses Haiku and is read-only: it may only list
+  events and search threads through your Google Calendar and Gmail connectors.
+  Each refresh uses a little of your Claude usage;
+  `JARVIS_PERSONAL_REFRESH_MIN` changes the interval and `0` turns it off.
+- **Right** — the machine (memory, load, uptime) and the link (down, up,
+  connected systems).
+- **Conversation** — the whole session under the orb, scrollable, newest at
+  the bottom. Typing opens beneath it.
+- **World** — the live globe, with God's Eye View running (below).
+- **Media**, in three tabs:
+  - *Live* — Al Jazeera English, DW, France 24, Sky News, ABC News (Australia)
+    and NBC News, from each channel's own YouTube live stream. Muted until you
+    ask for sound, and silent while you talk or JARVIS speaks.
+  - *Markets* — a watchlist (NVDA, AAPL, SPY, BTC) and an intraday chart.
+    Stocks come from Yahoo Finance, falling back to Nasdaq's public quote API
+    when Yahoo rate-limits; crypto from CoinGecko. Delayed quotes, not for
+    trading.
+  - *Headlines* — the six channels' RSS feeds, merged. Click a story to read
+    it.
+
+Ask for any of it: *"Put Sky News on."* · *"Show me Nvidia's chart."* ·
+*"Any headlines about Ukraine?"* · *"How's Bitcoin doing?"*
+
 ### JARVIS sees the world
 
 With [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (GEV)
@@ -210,17 +245,18 @@ frame.
    inside JARVIS. (Running GEV yourself? Put
    `GEV_FRAME_ANCESTORS=http://localhost:5180,http://127.0.0.1:5180` in its
    `.env`, with your JARVIS port.)
-3. Click **INITIALISE**. The globe loads inside JARVIS and WORLD VIEW lights up
-   in the SYSTEMS rail. GEV's own mic is off in this mode; JARVIS is the voice.
+3. Click **INITIALISE**. The globe loads in the dash's World panel and the
+   WORLD chip reads LINKED. GEV's own mic is off in this mode; JARVIS is the
+   voice.
 4. Ask: *"Take me to Tokyo."* · *"Turn on the flights layer."* · *"How many
    flights are in view?"* · *"What am I looking at?"*
 
-**Two layouts, switched for you.** JARVIS normally fills the screen with the
-globe in a round scope bottom-right. Any world command brings the globe full
-screen, with JARVIS docked as an orb top-right and the conversation in a card
-bottom-right; after a quiet minute — no world commands, nobody touching the
-globe, JARVIS idle — it slides back. **W**, clicking the orb, or clicking the
-scope switches by hand. Space and Enter still reach JARVIS while the globe has
+**Two layouts, switched for you.** JARVIS opens on the dash, with the globe in
+its World panel. Any world command brings the globe full screen, with JARVIS
+docked as an orb top-right and the conversation in a card bottom-right; after a
+quiet minute — no world commands, nobody touching the globe, JARVIS idle — it
+slides back to the dash. **W**, clicking the orb, or **Expand** on the World
+panel switches by hand. Space and Enter still reach JARVIS while the globe has
 focus.
 
 GEV can also run in a separate window at
@@ -236,7 +272,7 @@ inside JARVIS keeps the link. Design notes and what testing changed:
 |---|---|
 | **Space** (hold) | Talk. The microphone is open only while Space is held; release to send. Holding it while he speaks cuts him off |
 | **Enter** | Type instead of speaking (Enter sends, Escape closes) |
-| **W** | Switch between the world view and JARVIS (with God's Eye View running) |
+| **W** | Switch between the dash and the full-screen world view (with God's Eye View running) |
 | **V** | Cycle the browser voice |
 | **Escape** | Stand down |
 | **D** | Live diagnostics panel |
@@ -274,6 +310,7 @@ Everything is optional in bridge mode. Frontend settings live in `.env.local`
 | `ELEVENLABS_API_KEY` | — | Optional; enables the ElevenLabs voice + Scribe |
 | `GEV_DIR` | `~/Github/gods-eye-view` | God's Eye View checkout for the world view |
 | `GEV_ORIGIN` | `localhost:4173` | Page origins allowed to hold the world link |
+| `JARVIS_PERSONAL_REFRESH_MIN` | `30` | Minutes between the dash's calendar and inbox refreshes; `0` turns them off |
 
 ### Frontend (`.env.local`)
 

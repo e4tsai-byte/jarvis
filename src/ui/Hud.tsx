@@ -1,23 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { useStore, accentFor, type Phase } from '../store'
+import { useStore, accentFor } from '../store'
 import { Suggestions } from './Suggestions'
 import { BladeSweep, Blades } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
 import { GestureGuide } from './GestureGuide'
 import { TypeBar } from './TypeBar'
-
-const statusText: Record<Phase, string> = {
-  offline: 'OFFLINE',
-  boot: 'INITIALISING',
-  dormant: 'STANDBY — HOLD SPACE TO TALK',
-  waking: 'ONLINE',
-  listening: 'LISTENING',
-  thinking: 'PROCESSING',
-  tooling: 'ACCESSING SYSTEMS',
-  speaking: 'RESPONDING',
-}
+import { statusText } from './status'
 
 function Corner({ at }: { at: 'tl' | 'tr' | 'bl' | 'br' }) {
   return <div className={`corner corner-${at}`} />
@@ -78,7 +68,7 @@ function scramble(s: string, seed: number) {
  * The rAF loop repaints on a 42ms gate rather than every frame, and stops dead
  * the moment the frontier catches up.
  */
-function DecodeText({ text }: { text: string }) {
+export function DecodeText({ text }: { text: string }) {
   const reduced = useReducedMotion()
   const settled = useRef(0)
   const raf = useRef(0)

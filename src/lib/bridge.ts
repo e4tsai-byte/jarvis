@@ -117,6 +117,25 @@ export function watchWorldTool(fn: () => void) {
   onWorldTool = fn
 }
 
+/** A media hub command from JARVIS (the jarvis_media tools). */
+export type MediaCommand = {
+  tab?: 'live' | 'markets' | 'headlines'
+  channel?: string
+  symbol?: string
+  filter?: string
+  sound?: boolean
+}
+let onMedia: ((cmd: MediaCommand) => void) | null = null
+export function watchMedia(fn: (cmd: MediaCommand) => void) {
+  onMedia = fn
+}
+
+/** The calendar and inbox panel's data, pushed after each background refresh. */
+let onPersonal: ((data: unknown) => void) | null = null
+export function watchPersonal(fn: (data: unknown) => void) {
+  onPersonal = fn
+}
+
 /**
  * Connection state, for the UI.
  *
@@ -226,6 +245,11 @@ function dispatch(ws: WebSocket) {
       onUi?.(msg.op, (msg.args ?? {}) as Record<string, unknown>)
     } else if (msg.type === 'world') {
       onWorld?.(typeof msg.linked === 'boolean' ? msg.linked : null)
+    } else if (msg.type === 'media') {
+      const m = msg as unknown as MediaCommand
+      onMedia?.({ tab: m.tab, channel: m.channel, symbol: m.symbol, filter: m.filter, sound: m.sound })
+    } else if (msg.type === 'personal') {
+      onPersonal?.((msg as unknown as { data?: unknown }).data ?? null)
     }
   })
 }

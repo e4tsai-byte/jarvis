@@ -48,26 +48,28 @@ body::after {
 }
 
 /* --------------------------------------------------------------- world view
-   God's Eye View in JARVIS's own tab (WorldView.tsx). While a world view
-   exists the root carries data-layout: 'world' puts the globe full screen and
-   docks the reactor as an orb top-right; 'jarvis' is the usual screen with the
-   globe in a scope bottom-right. Every move is a transform and a clip on the
-   same two elements — nothing reflows and the globe never reloads — and the
-   pixel geometry arrives as variables from WorldView's place(). */
+   God's Eye View in JARVIS's own tab (WorldView.tsx). The root carries
+   data-layout: 'dash' places the globe and the reactor in their dashboard
+   panels (Dash.tsx measures them); 'world' puts the globe full screen and
+   docks the reactor as an orb top-right. Every move is a transform and a crop
+   on the same two elements — nothing reflows and the globe never reloads. */
 
 .world-frame {
   position: fixed;
   inset: 0;
-  /* Above the reactor, below the HUD: the scope sits on JARVIS's screen. */
+  /* On the dash: above the reactor, below the dash chrome and the HUD. The
+     crop limits hits to the panel too, so the globe there can be dragged. */
   z-index: 3;
-  pointer-events: none;
   background: var(--bg);
-  transform: translate(var(--scope-x, 0px), var(--scope-y, 0px)) scale(var(--scope-scale, 0.25));
-  clip-path: circle(50vh at 50% 50%);
+  transform: translate(var(--world-tx, 0px), var(--world-ty, 0px)) scale(var(--world-s, 0.3));
+  clip-path: inset(var(--world-clip, 0px) round var(--world-r, 0px));
   transition:
     transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
     clip-path 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
+/* Not linked yet: the panel shows its own note instead of an empty page. */
+[data-world='off'] .world-frame { visibility: hidden; }
 
 .world-frame iframe {
   display: block;
@@ -76,24 +78,47 @@ body::after {
   border: 0;
 }
 
+/* Inset crops at both ends, so the switch animates rather than jumps. */
 [data-layout='world'] .world-frame {
   z-index: 0;
-  pointer-events: auto;
   transform: none;
-  clip-path: circle(75% at 50% 50%);
+  clip-path: inset(0px 0px round 0px);
 }
 
+/* The reactor is placed by its camera, not shrunk: Scene.tsx zooms out and
+   shifts the picture so the orb lands in the dash's panel, and the canvas
+   stays full screen so its field can fill JARVIS's half. The mask gives that
+   half a soft right edge where it meets the globe column. The world view's orb
+   is cut from the same spot, well inside that half, so one mask serves both
+   layouts — a mask does not animate, and a different one would pop. */
 [data-layout] .scene {
-  clip-path: circle(75% at 50% 50%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 calc(var(--jarvis-right, 55vw) - 160px),
+    transparent calc(var(--jarvis-right, 55vw) + 12px)
+  );
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(var(--jarvis-right, 55vw) - 160px),
+    transparent calc(var(--jarvis-right, 55vw) + 12px)
+  );
+  transform-origin: var(--reactor-cx, 50%) var(--reactor-cy, 50%);
   transition:
     transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
     clip-path 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* The reactor contracts into its orb, uncovering the globe underneath. */
+[data-layout='dash'] .scene {
+  transform: none;
+  clip-path: inset(0px 0px 0px 0px round 0px);
+}
+
+/* The reactor contracts into its orb top-right, uncovering the globe. The
+   crop is a square around the ring with fully rounded corners — a circle —
+   and the move carries the ring's centre onto the orb's (Dash's measure). */
 [data-layout='world'] .scene {
-  transform: translate(var(--orb-x), var(--orb-y)) scale(var(--orb-scale));
-  clip-path: circle(30vh at 50% 50%);
+  transform: translate(var(--orb-tx), var(--orb-ty)) scale(var(--orb-scale));
+  clip-path: inset(var(--orb-clip) round 50%);
 }
 
 [data-layout] .instruments,
@@ -155,7 +180,6 @@ body::after {
   width: min(420px, 36vw);
 }
 
-.world-scope-ring,
 .world-orb-hit {
   position: fixed;
   z-index: 5;
@@ -163,40 +187,10 @@ body::after {
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
-  pointer-events: auto;
 }
-.world-scope-ring:focus-visible,
 .world-orb-hit:focus-visible {
   outline: 1px solid var(--interface);
   outline-offset: 4px;
-}
-
-.world-scope-ring {
-  right: 28px;
-  bottom: 28px;
-  width: 240px;
-  height: 240px;
-  border: 1px solid color-mix(in srgb, var(--interface) 55%, transparent);
-  box-shadow:
-    0 0 34px color-mix(in srgb, var(--interface) 22%, transparent),
-    inset 0 0 36px rgba(0, 0, 0, 0.55);
-  transition: opacity 400ms ease, border-color 200ms ease;
-}
-.world-scope-ring:hover { border-color: var(--interface); }
-.world-scope-ring span {
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font: 9px/1 'JetBrains Mono', monospace;
-  letter-spacing: 0.32em;
-  color: var(--interface);
-  opacity: 0.7;
-  white-space: nowrap;
-}
-[data-layout='world'] .world-scope-ring {
-  opacity: 0;
-  pointer-events: none;
 }
 
 .world-orb-hit {

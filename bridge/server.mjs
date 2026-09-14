@@ -22,6 +22,16 @@ import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
 import { createWorldLink, loadWorldTools, worldOriginAllowed, worldServer, GEV_DIR } from './world.mjs'
+import {
+  CHANNELS,
+  SYMBOL,
+  createPersonal,
+  headlines,
+  liveVideo,
+  market,
+  mediaServer,
+  telemetry,
+} from './dash.mjs'
 import { homedir, tmpdir } from 'node:os'
 import { readFileSync, realpathSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
@@ -293,6 +303,10 @@ function decideTool(name) {
     // the public-data reads GEV already makes. Named here because the verb
     // rules would read `set_layer_visibility` as a write.
     if (server === 'jarvis_world') return true
+
+    // The dashboard's media hub: it plays, charts and lists public news and
+    // market data on the user's own screen, and changes nothing anywhere.
+    if (server === 'jarvis_media') return true
 
     const tool = mcpToolOf(name)
     if (EFFECTFUL_VERB.test(tool) && !VETO_EXEMPT.has(`${server}__${tool}`)) {
@@ -704,6 +718,46 @@ const handleRequest = async (req, res) => {
     )
   }
 
+  // The dashboard's data (dash.mjs). JSON only, under the same origin rules as
+  // everything else here; every upstream fetch happens server-side.
+  if (req.method === 'GET' && req.url?.startsWith('/dash/')) {
+    const url = new URL(req.url, 'http://x')
+    const json = (status, body) => {
+      res.writeHead(status, { ...cors, 'content-type': 'application/json', 'cache-control': 'no-store' })
+      return res.end(JSON.stringify(body))
+    }
+    try {
+      switch (url.pathname) {
+        case '/dash/telemetry':
+          return json(200, await telemetry())
+        case '/dash/market': {
+          const symbol = String(url.searchParams.get('symbol') ?? '').toUpperCase()
+          if (!SYMBOL.test(symbol)) return json(400, { error: 'not a market symbol' })
+          return json(200, await market(symbol))
+        }
+        case '/dash/channels':
+          return json(200, CHANNELS.map(({ id, name, short }) => ({ id, name, short })))
+        case '/dash/live': {
+          const id = String(url.searchParams.get('channel') ?? '')
+          if (!CHANNELS.some((c) => c.id === id)) return json(400, { error: 'unknown channel' })
+          return json(200, await liveVideo(id))
+        }
+        case '/dash/headlines':
+          return json(200, await headlines('all'))
+        case '/dash/personal':
+          return json(200, {
+            enabled: personal.enabled,
+            everyMinutes: personal.everyMinutes,
+            data: personal.get(),
+          })
+        default:
+          return json(404, { error: 'not found' })
+      }
+    } catch (err) {
+      return json(502, { error: String(err?.message ?? err).slice(0, 200) })
+    }
+  }
+
   // Serve local image files to the page. Screenshots and generated art land on
   // disk as absolute paths, and a page served over http can't read file:// —
   // so the bridge, which can, hands them over.
@@ -1000,6 +1054,10 @@ const server = http.createServer((req, res) => {
 const WORLD_TOOLS = await loadWorldTools()
 const worldLink = createWorldLink()
 
+/** The dashboard's calendar and inbox, refreshed in the background (dash.mjs). */
+const personal = createPersonal()
+personal.start()
+
 const wss = new WebSocketServer({
   server,
   // The handshake is the only place a page can be turned away, so it happens
@@ -1124,6 +1182,10 @@ wss.on('connection', (socket, req) => {
   const offWorld = WORLD_TOOLS
     ? worldLink.onChange((linked) => send({ type: 'world', linked }))
     : () => {}
+
+  // The dashboard's calendar and inbox: what is known now, then each refresh.
+  if (personal.get()) send({ type: 'personal', data: personal.get() })
+  const offPersonal = personal.onChange((data) => send({ type: 'personal', data }))
 
   /**
    * Which question the agent is currently answering.
@@ -1269,6 +1331,8 @@ wss.on('connection', (socket, req) => {
         // The world view, when a God's Eye View checkout is here. Its link is
         // shared by every conversation: there is one globe on the screen.
         ...(WORLD_TOOLS ? { jarvis_world: worldServer(worldLink, WORLD_TOOLS) } : {}),
+        // The dashboard's media hub: live news, markets and headlines.
+        jarvis_media: mediaServer((cmd) => send({ type: 'media', ...cmd })),
       },
       // A plain system prompt, not the claude_code preset. The preset is
       // tuned for a coding agent — verbose, file-oriented, and a large chunk
@@ -1512,6 +1576,7 @@ wss.on('connection', (socket, req) => {
   socket.on('close', () => {
     console.log('[jarvis] client disconnected')
     offWorld()
+    offPersonal()
     closed = true
     deliver?.(null)
     session.close?.()

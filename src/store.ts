@@ -231,9 +231,33 @@ type State = {
   /** God's Eye View link state for the WORLD VIEW light. null when the bridge
    *  has no world view configured, so the light is left out entirely. */
   world: boolean | null
-  /** 'world': globe full screen, JARVIS docked as an orb. 'jarvis': JARVIS full
-   *  screen, globe in a scope. Only means anything while `world` is not null. */
-  layout: 'jarvis' | 'world'
+  /** 'dash': everything at once. 'world': the globe full screen, JARVIS docked
+   *  as an orb. */
+  layout: 'dash' | 'world'
+  /** When the layout last changed — any switch, by hand or not, restarts the
+   *  quiet minute before the world view hands back to the dashboard. */
+  layoutAt: number
+  /** Where the dash wants the reactor: the offset from the viewport's centre to
+   *  the centre of its panel, in CSS pixels, and the zoom that fits the ring in
+   *  it. The scene frames its camera on this in both layouts. null until the
+   *  dash has measured. */
+  reactorFrame: { tx: number; ty: number; k: number } | null
+  /** What the media hub shows. JARVIS sets it by voice; the tabs by click. */
+  media: {
+    tab: 'live' | 'markets' | 'headlines'
+    channel: string
+    symbol: string
+    filter: string
+    /** The user wants sound. It is still muted while they talk or he does. */
+    sound: boolean
+  }
+  /** Next events and unread mail, from the bridge's background refresh. */
+  personal: {
+    at: number
+    error: string | null
+    events: { start: string; title: string; location: string }[]
+    unread: { count: number; latest: { from: string; subject: string; at: string }[] } | null
+  } | null
   /** Transient status line during boot, e.g. the voice model download. */
   bootNote: string
   /** Cards currently on the display, newest last. */
@@ -251,7 +275,10 @@ type State = {
   setGestures: (on: boolean) => void
   setLooking: (why: string | null) => void
   setWorld: (linked: boolean | null) => void
-  setLayout: (layout: 'jarvis' | 'world') => void
+  setLayout: (layout: 'dash' | 'world') => void
+  setReactorFrame: (frame: State['reactorFrame']) => void
+  setMedia: (patch: Partial<State['media']>) => void
+  setPersonal: (personal: State['personal']) => void
   setBootNote: (n: string) => void
   pushPanel: (p: Panel) => void
   clearPanels: () => void
@@ -290,8 +317,13 @@ export const useStore = create<State>((set) => ({
   gestures: false,
   looking: null,
   world: null,
-  // JARVIS first: the globe waits in its scope until a world tool calls it up.
-  layout: 'jarvis',
+  // The dashboard first: the globe waits in its panel until a world tool, W or
+  // the expand button calls it up full screen.
+  layout: 'dash',
+  layoutAt: 0,
+  reactorFrame: null,
+  media: { tab: 'live', channel: 'sky', symbol: '', filter: '', sound: false },
+  personal: null,
   panels: [],
   blades: [],
   focusedBlade: null,
@@ -303,7 +335,10 @@ export const useStore = create<State>((set) => ({
   setGestures: (gestures) => set({ gestures }),
   setLooking: (looking) => set({ looking }),
   setWorld: (world) => set({ world }),
-  setLayout: (layout) => set({ layout }),
+  setLayout: (layout) => set({ layout, layoutAt: Date.now() }),
+  setReactorFrame: (reactorFrame) => set({ reactorFrame }),
+  setMedia: (patch) => set((s) => ({ media: { ...s.media, ...patch } })),
+  setPersonal: (personal) => set({ personal }),
   setBootNote: (bootNote) => set({ bootNote }),
   // Three is as many as fits around the reactor without crowding it. Sticky
   // panels are exempt from the cull — the tool description promises they stay

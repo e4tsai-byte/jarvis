@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Scene } from './scene/Scene'
 import { Hud } from './ui/Hud'
 import { WorldView } from './ui/WorldView'
+import { Dash } from './ui/Dash'
 import { Boot } from './ui/Boot'
 import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
@@ -26,6 +27,8 @@ import {
   watchCapture,
   watchUi,
   watchWorld,
+  watchMedia,
+  watchPersonal,
   watchConnection,
   connectedLabels,
   usingBridge,
@@ -462,6 +465,23 @@ export default function App() {
     // The WORLD VIEW light. The bridge pushes the link state on connect and on
     // every change, so a reconnect re-announces it.
     watchWorld((linked) => store.getState().setWorld(linked))
+    // The media hub, switched by JARVIS's voice. Showing something there means
+    // coming back to the dashboard to see it.
+    watchMedia((cmd) => {
+      const s = store.getState()
+      const patch: Partial<typeof s.media> = {}
+      if (cmd.tab) patch.tab = cmd.tab
+      if (cmd.channel) patch.channel = cmd.channel
+      if (cmd.symbol) patch.symbol = cmd.symbol
+      if (cmd.tab === 'headlines') patch.filter = cmd.filter ?? ''
+      if (cmd.sound) patch.sound = true
+      s.setMedia(patch)
+      if (s.layout === 'world') s.setLayout('dash')
+    })
+    // The calendar and inbox panel, after each background refresh.
+    watchPersonal((data) =>
+      store.getState().setPersonal(data as ReturnType<typeof store.getState>['personal']),
+    )
     watchConnection((state) => {
       if (state === 'lost') {
         store.getState().setError('Bridge connection lost — reconnecting.')
@@ -721,6 +741,7 @@ export default function App() {
     <>
       <Scene />
       <WorldView />
+      <Dash />
       <Hud onType={onTyped} />
       <Boot />
       <Diagnostics />

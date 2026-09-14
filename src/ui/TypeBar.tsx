@@ -15,6 +15,7 @@ export function TypeBar({ onSend }: { onSend: (text: string) => void }) {
   const phase = useStore((s) => s.phase)
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
+  const input = useRef<HTMLInputElement>(null)
 
   const live = phase !== 'offline' && phase !== 'boot'
   // Read by the window listener, so it is bound once rather than per phase.
@@ -32,6 +33,9 @@ export function TypeBar({ onSend }: { onSend: (text: string) => void }) {
       // arrive in the freshly focused field and submit it.
       e.preventDefault()
       setOpen(true)
+      // A bar that is already open but lost focus — a click on the dash's
+      // media hub, say — takes it back, so Enter always lands in the field.
+      input.current?.focus()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -68,6 +72,7 @@ export function TypeBar({ onSend }: { onSend: (text: string) => void }) {
           <span className="typebar-who">YOU</span>
           <input
             autoFocus
+            ref={input}
             className="typebar-input"
             value={text}
             onChange={(e) => setText(e.target.value)}

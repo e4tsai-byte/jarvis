@@ -79,6 +79,16 @@ export function watchWorldTool(fn: () => void): void {
   if (usingBridge) bridge.watchWorldTool(fn)
 }
 
+/** Media hub commands from JARVIS. */
+export function watchMedia(fn: (cmd: bridge.MediaCommand) => void): void {
+  if (usingBridge) bridge.watchMedia(fn)
+}
+
+/** Calendar and inbox updates from the bridge's background refresh. */
+export function watchPersonal(fn: (data: unknown) => void): void {
+  if (usingBridge) bridge.watchPersonal(fn)
+}
+
 /**
  * The one thing the bridge asks US for.
  *

@@ -1,0 +1,948 @@
+/* ------------------------------------------------------------------ dash
+   The all-at-once dashboard (Dash.tsx, MediaHub.tsx).
+
+   JARVIS's half is one lit field: the reactor's dust and glow fill it edge to
+   edge (the canvas is framed by its camera, see Scene.tsx; the glow is on
+   #root below), and everything in it floats on that field with no boxes and
+   no fills — the orb at its centre, the readouts around it on traces that
+   flow out of it, the conversation underneath. The right-hand column, the globe and
+   the media hub, is framed, because those are windows onto something else.
+   Geometry the rest of the page needs comes out of Dash's measure(). */
+
+.dash {
+  --phase: var(--accent);
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+  grid-template-rows: 30px minmax(0, 1fr);
+  grid-template-areas:
+    'jarvis top'
+    'jarvis right';
+  column-gap: 30px;
+  row-gap: 12px;
+  padding: 20px 18px 18px 28px;
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  transition: opacity 400ms ease;
+}
+
+[data-layout='world'] .dash {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 300ms ease, visibility 0s 300ms;
+}
+
+/* The reactor's colour washed under the canvas, centred on the orb, so the
+   gaps between the dust are lit rather than black. */
+[data-layout='dash'] #root {
+  background:
+    radial-gradient(
+      ellipse 40vw 64vh at var(--reactor-cx, 28vw) var(--reactor-cy, 42vh),
+      rgba(23, 179, 179, 0.16),
+      rgba(23, 179, 179, 0.05) 55%,
+      transparent 100%
+    ),
+    var(--bg);
+}
+
+/* Scanlines only. The full-screen HUD's edge darkening would pool shadow in
+   the corners of a half that is meant to be lit to its edges. */
+[data-layout='dash'] body::after {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 229, 255, 0.028) 0px,
+    rgba(0, 229, 255, 0.028) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* ----------------------------------------------------------------- top bar */
+
+.dash-top {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.dash-chip {
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  opacity: 0.45;
+}
+.dash-chip.on {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+/* An open microphone is the one state worth catching the eye. */
+.dash-chip.hot {
+  color: #ff8a8a;
+  border-color: color-mix(in srgb, #ff8a8a 60%, transparent);
+}
+
+.dash-clock {
+  margin-left: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+/* ------------------------------------------------------------ JARVIS's half */
+
+.dash-jarvis {
+  grid-area: jarvis;
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 1.75fr) minmax(130px, 0.9fr);
+  grid-template-rows: auto minmax(0, 1fr) minmax(150px, 0.42fr);
+  grid-template-areas:
+    'top   top   top'
+    'left  frame right'
+    'convo convo convo';
+  column-gap: 30px;
+  row-gap: 24px;
+}
+.dash-jarvis > * {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Rail titles: the HUD's diamond tick, the name, and a hairline that fades
+   out to the right — on the left flank, the thread its trace joins. */
+.dash-title,
+.dash-label {
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+.dash-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 12px;
+  opacity: 0.8;
+}
+.dash-title::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px var(--accent);
+}
+.dash-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, transparent), transparent);
+}
+.dash-flank-left .dash-title::after {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 45%, transparent));
+}
+
+.dash-label {
+  position: absolute;
+  top: 8px;
+  left: 11px;
+  z-index: 1;
+  opacity: 0.6;
+}
+
+/* --- the top row: the Mac at a glance */
+
+.dash-row-top {
+  grid-area: top;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 7%;
+}
+/* An arc over the orb: the rings drop toward its shoulders while the traffic
+   stays on top. A transform, so the rows below do not move. */
+.dash-row-top > [data-anchor='cpu'],
+.dash-row-top > [data-anchor='mem'] {
+  transform: translateY(38px);
+}
+
+.dash-ring {
+  position: relative;
+  margin: 0;
+  width: 76px;
+  display: grid;
+  justify-items: center;
+}
+.dash-ring svg {
+  width: 76px;
+  height: 76px;
+  overflow: visible;
+}
+.dash-ring-track,
+.dash-ring-fill,
+.dash-ring-inner {
+  fill: none;
+  stroke-linecap: round;
+}
+.dash-ring-track {
+  stroke: color-mix(in srgb, var(--accent) 16%, transparent);
+  stroke-width: 3;
+}
+.dash-ring-fill {
+  stroke: var(--accent);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px var(--accent));
+  transition: stroke-dasharray 600ms ease;
+}
+.dash-ring-inner {
+  stroke: color-mix(in srgb, var(--accent) 22%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 1 3;
+}
+.dash-ring b {
+  position: absolute;
+  top: 0;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 400;
+  font-size: 14px;
+  color: #e8f7fb;
+}
+.dash-ring figcaption {
+  margin-top: -6px;
+  font-size: 8px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.dash-traffic {
+  flex: 0 1 38%;
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.dash-traffic-label {
+  font-size: 8px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  text-align: center;
+}
+.dash-traffic-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 38px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.dash-traffic-bars i {
+  flex: 1;
+  height: 100%;
+  background: color-mix(in srgb, var(--accent) 75%, transparent);
+  transform-origin: bottom;
+  transition: transform 600ms ease;
+}
+
+/* --- the flanks */
+
+/* Gathered about the orb's middle rather than spread to the corners, so the
+   groups sit around it like satellites. */
+.dash-flank {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 56px;
+}
+.dash-flank-left { grid-area: left; }
+.dash-flank-right { grid-area: right; }
+
+.dash-block { min-height: 0; }
+
+/* LABEL  value, the way the HUD's rails read. */
+.dash-readout {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.dash-readout div {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+}
+.dash-readout dt {
+  font-size: 8px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.dash-readout dd,
+.dash-event time {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #e8f7fb;
+  text-transform: none;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dash-event {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 8px;
+  margin: 7px 0;
+  line-height: 1.35;
+}
+.dash-event span,
+.dash-mail span {
+  color: #e8f7fb;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-event small {
+  display: block;
+  font-size: 10px;
+  opacity: 0.55;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sender over subject, hung off a thin rule like the transcript's lines. */
+.dash-mail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 10px;
+  padding-left: 10px;
+  border-left: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.dash-mail b {
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-empty {
+  margin: 4px 0;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.55;
+}
+
+/* --- the orb */
+
+/* No frame: the orb floats on its own field, its name above it and your voice
+   below, and the traces carry the eye out from it to everything else. */
+.dash-core {
+  grid-area: frame;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-core-head {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 18px 12px 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.dash-brand {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.42em;
+  color: var(--phase);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--phase) 70%, transparent);
+  transition: color 600ms ease;
+}
+
+.dash-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  opacity: 0.85;
+}
+
+.dash-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--phase);
+  box-shadow: 0 0 10px var(--phase);
+}
+
+.dash-slot {
+  position: relative;
+  min-height: 0;
+}
+.dash-reactor { flex: 1; }
+
+.dash-core-foot { padding: 0 20% 18px; }
+
+/* A waveform: bars grow both ways from the centre line. */
+.dash-voice {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 30px;
+}
+.dash-voice i {
+  flex: 1;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 1px;
+  opacity: 0.85;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+  transform-origin: center;
+  transform: scaleY(0.05);
+}
+
+/* --- the circuit traces */
+
+.dash-jarvis > .dash-traces {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Each run is lit at the orb and fades toward the readout it feeds; the
+   stroke is a per-trace gradient between these two stops. */
+.trace {
+  fill: none;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.75;
+  transition: opacity 400ms ease;
+}
+.trace-core {
+  stop-color: var(--phase);
+  stop-opacity: 0.8;
+}
+.trace-edge {
+  stop-color: var(--accent);
+  stop-opacity: 0.22;
+}
+
+/* One short bright dash per trace, run from the panel outwards. pathLength
+   is 100, so the period of 200 keeps a single dash on the line. */
+.trace-pulse {
+  fill: none;
+  stroke: var(--phase);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 7 193;
+  stroke-dashoffset: 7;
+  opacity: 0;
+  filter: drop-shadow(0 0 4px var(--phase));
+  transition: opacity 400ms ease;
+}
+
+.trace-root {
+  fill: var(--phase);
+  opacity: 0.8;
+}
+.trace-node {
+  fill: var(--accent);
+  filter: drop-shadow(0 0 3px var(--accent));
+}
+
+.dash[data-busy] .trace { opacity: 1; }
+.dash[data-busy] .trace-pulse {
+  opacity: 1;
+  animation: trace-flow 1.4s linear infinite;
+}
+
+@keyframes trace-flow {
+  from { stroke-dashoffset: 7; }
+  to { stroke-dashoffset: -100; }
+}
+
+/* Still says he is working, without the motion. */
+@media (prefers-reduced-motion: reduce) {
+  .dash[data-busy] .trace-pulse {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* --- the conversation */
+
+.dash-convo {
+  grid-area: convo;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-convo-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.dash-convo-head .dash-title {
+  flex: 1;
+  margin: 0;
+}
+
+.dash-hint {
+  font-size: 8px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.45;
+}
+
+/* The whole session, scrollable. Lines fade out under the top edge rather
+   than being cut by it. */
+.dash-convo-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 10px 4px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 35%, transparent) transparent;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 28px);
+  mask-image: linear-gradient(to bottom, transparent, #000 28px);
+}
+/* Newest at the bottom while there are only a few lines. */
+.dash-convo-list > :first-child { margin-top: auto; }
+.dash-convo-list .log-line { font-size: 13px; }
+
+/* Room for the typing bar under the last line while it is open. */
+html:has(.typebar) .dash-convo-list { padding-bottom: 56px; }
+
+/* ------------------------------------------------------------ right column */
+
+.dash-right {
+  grid-area: right;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+/* The two framed windows. The world has no fill, so the globe placed behind
+   it shows; the hub is glass over the page. */
+.dash-world,
+.dash-media {
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 4px;
+}
+.dash-world { flex: 1; }
+
+.dash-expand {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 1;
+  pointer-events: auto;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: rgba(2, 10, 14, 0.7);
+  color: var(--accent);
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.dash-expand:hover { background: color-mix(in srgb, var(--accent) 16%, rgba(2, 10, 14, 0.7)); }
+
+.dash-offline {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  opacity: 0.6;
+}
+
+.dash button:focus-visible {
+  outline: 1px solid var(--interface);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------- media hub */
+
+.dash-media {
+  position: relative;
+  min-height: 0;
+  flex: 1.15;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px 10px;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--accent) 5%, rgba(2, 10, 14, 0.66));
+  backdrop-filter: blur(6px);
+}
+
+.media-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.media-tabs button,
+.media-row button {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  cursor: pointer;
+}
+.media-tabs button[aria-selected='true'],
+.media-row button.on {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.media-tabs button:hover,
+.media-row button:hover { opacity: 1; }
+
+.media-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.media-live {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.media-screen {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: #000;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.media-screen iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.media-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.media-row button { padding: 3px 8px; letter-spacing: 0.16em; }
+.media-sound { margin-left: auto; }
+
+.media-note {
+  margin: auto;
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  opacity: 0.6;
+}
+
+.media-markets {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 10px;
+}
+
+.media-chart {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.media-watch {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: auto;
+}
+.media-watch button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+  background: transparent;
+  color: #e8f7fb;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+.media-watch button.on {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* The arrow carries the direction; the number stays in text ink. */
+i.up { color: #5fe0a4; font-style: normal; }
+i.down { color: #ff8a8a; font-style: normal; }
+
+.price-chart {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.price-chart svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  touch-action: none;
+}
+.price-head {
+  position: absolute;
+  top: 0;
+  left: 6px;
+  right: 6px;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.price-head b {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: #e8f7fb;
+}
+.price-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  opacity: 0.55;
+}
+.price-now {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #e8f7fb;
+}
+.price-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.price-area { fill: color-mix(in srgb, var(--accent) 12%, transparent); }
+.price-prev {
+  stroke: color-mix(in srgb, var(--accent) 40%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.price-axis {
+  fill: color-mix(in srgb, #e8f7fb 55%, transparent);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+.price-hover line {
+  stroke: color-mix(in srgb, #e8f7fb 45%, transparent);
+  stroke-width: 1;
+}
+.price-hover circle {
+  fill: var(--accent);
+  stroke: #02080c;
+  stroke-width: 2;
+}
+.price-hover text {
+  fill: #e8f7fb;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.price-source {
+  position: absolute;
+  right: 6px;
+  bottom: 0;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.4;
+}
+
+.media-headlines {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.media-headlines ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.media-headlines li button {
+  display: block;
+  width: 100%;
+  padding: 7px 2px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  background: none;
+  color: #e8f7fb;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  text-align: left;
+  cursor: pointer;
+}
+.media-headlines li button:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.media-src {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--accent);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.media-filter {
+  margin: 0 0 6px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------ HUD, on the dash */
+
+/* The dash has its own readouts, conversation and panels, so the full-screen
+   chrome and the HUD's short transcript go. */
+[data-layout='dash'] .hud :is(.hud-top, .corner, .rail, .suggest, .hud-bottom, .blades, .log) {
+  visibility: hidden;
+}
+
+/* Typing opens under the conversation. The centring is framer's inline
+   x: -50%, so the bar is placed by its middle. */
+[data-layout='dash'] .typebar {
+  left: calc(var(--convo-x) + var(--convo-w) / 2);
+  bottom: calc(var(--convo-bottom) + 2px);
+  width: var(--convo-w);
+}
+
+/* What you are saying, low in the panel, above the waveform. */
+[data-layout='dash'] .caption {
+  left: calc(var(--reactor-x) + var(--reactor-w) / 2);
+  top: calc(var(--reactor-y) + var(--reactor-h) - 26px);
+  bottom: auto;
+  max-width: calc(var(--reactor-w) - 32px);
+  font-size: 13px;
+}
+
+/* Warnings and the tool readout high in the panel, under the status line,
+   clear of the ring. */
+[data-layout='dash'] .error {
+  left: calc(var(--reactor-x) + var(--reactor-w) / 2);
+  top: calc(var(--reactor-y) + 2px);
+  bottom: auto;
+  max-width: calc(var(--reactor-w) - 32px);
+}
+
+[data-layout='dash'] .tool-badge {
+  left: calc(var(--reactor-x) + var(--reactor-w) / 2);
+  top: calc(var(--reactor-y) + 16px);
+}
+
+/* JARVIS's panels and articles open in the media hub; thrown to full screen,
+   they still take the whole screen. */
+[data-layout='dash'] .blades-stack {
+  inset: auto;
+  left: var(--media-x);
+  top: var(--media-y);
+  width: var(--media-w);
+  height: var(--media-h);
+}
+[data-layout='dash'] .blades-stack .bl:not(.bl-expanded) {
+  width: 100%;
+  height: 100%;
+}
+[data-layout='dash'] .blades-stack:has(.bl-expanded) {
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* The instrument rings follow the orb into its panel, at the camera's zoom.
+   The trailing -2vh is their own resting lift, which the layout transform
+   would otherwise replace. */
+[data-layout='dash'] .instruments {
+  transform: translate(var(--reactor-tx), var(--reactor-ty)) scale(var(--reactor-s)) translateY(-2vh);
+  transition:
+    transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 400ms ease;
+}
