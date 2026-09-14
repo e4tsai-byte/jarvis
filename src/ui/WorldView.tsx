@@ -120,9 +120,18 @@ export function WorldView() {
       const m = e.data as { source?: string; type?: string; key?: string; code?: string }
       if (m?.source !== 'gev') return
       lastActivity.current = Date.now()
-      if (m.type === 'key' && (m.key === ' ' || m.key === 'Enter' || m.key === 'w')) {
+      // The release matters as much as the press: talking is hold-to-talk,
+      // and a Space release that stayed inside the frame would leave the
+      // microphone open.
+      const up = m.type === 'keyup'
+      if ((m.type === 'key' || up) && (m.key === ' ' || m.key === 'Enter' || m.key === 'w')) {
         window.dispatchEvent(
-          new KeyboardEvent('keydown', { key: m.key, code: m.code ?? '', bubbles: true, cancelable: true }),
+          new KeyboardEvent(up ? 'keyup' : 'keydown', {
+            key: m.key,
+            code: m.code ?? '',
+            bubbles: true,
+            cancelable: true,
+          }),
         )
       }
     }

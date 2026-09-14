@@ -6,7 +6,7 @@ import { useStore } from '../store'
  * Typing, for when talking out loud isn't an option.
  *
  * Enter opens it, Enter sends, Escape puts it away. A typed line is an ordinary
- * turn: it needs no wake word, cuts him off mid-answer the way speaking would,
+ * turn: it cuts him off mid-answer the way holding Space does,
  * and the reply is still spoken and still lands in the transcript. It stays
  * open after sending, so a follow-up is one more line rather than another
  * Enter.

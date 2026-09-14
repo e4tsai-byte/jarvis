@@ -306,7 +306,7 @@ function connect(): Promise<WebSocket> {
   return connecting
 }
 
-/** Open the socket early so the first "Hey Jarvis" isn't waiting on a handshake. */
+/** Open the socket early so the first question isn't waiting on a handshake. */
 export async function warmBridge(): Promise<void> {
   await connect()
   // Don't block startup if the bridge never announces — the dispatcher fills

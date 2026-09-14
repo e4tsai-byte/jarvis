@@ -6,7 +6,7 @@ import { Boot } from './ui/Boot'
 import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
 import { useStore } from './store'
-import { startVoice, type Voice, type VoiceMode } from './lib/voice'
+import { startVoice, type Voice } from './lib/voice'
 import { createSpeaker, cycleVoice, currentVoiceName } from './lib/tts'
 import * as sfx from './lib/sfx'
 import * as music from './lib/music'
@@ -15,7 +15,7 @@ import { listenForClap } from './lib/clap'
 import * as camera from './lib/camera'
 import * as kokoro from './lib/kokoro'
 import { TTS_ENGINE } from './config'
-import { forTool, attention } from './lib/fillers'
+import { forTool } from './lib/fillers'
 import {
   ask,
   warm,
@@ -43,19 +43,11 @@ import { env } from './config'
  * cannot be interrupted: while it is awaiting the answer, nothing is listening,
  * so there is no way for the user to get a word in.
  *
- * It is an event machine now. The voice loop runs continuously and pushes
- * events at us; every one of them is legal in every phase. Saying anything at
- * all stops him talking, and whatever you say next becomes the new turn.
+ * It is an event machine now, driven by one key. Holding Space opens the
+ * microphone — cutting him off if he is mid-answer — and releasing it sends
+ * what was said; every event is legal in every phase. Nothing else opens the
+ * mic, so a sniff or a keystroke can never interrupt him or become a question.
  */
-
-/** How long to wait for someone to start speaking after he wakes. Generous:
- *  people say his name and *then* think about what they wanted. */
-const AWAIT_SPEECH_MS = 14000
-
-/** After an answer, how long the mic stays open for a follow-up before he
- *  drops back to standby. Long enough that you don't have to say the name
- *  again to continue a thought. */
-const FOLLOW_UP_MS = 11000
 
 /** crypto.randomUUID needs a secure context, which a LAN address over plain
  *  http is not. Not worth failing a whole turn over an id. */
@@ -63,8 +55,8 @@ const newId = () =>
   globalThis.crypto?.randomUUID?.() ??
   `id${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
 
-/** The same mishearings voice.ts accepts for the wake word — otherwise a turn
- *  that woke him as "travis" gets that word sent on to the model as a question. */
+/** Mishearings of his name — without these, "Travis, what's the weather" sends
+ *  "Travis" on to the model as part of the question. */
 const NAME = '(?:jarvis|jarvys|jervis|travis|jarviss|java\'s|jarv)'
 /** A bare vocative — "Jarvis", "hey jarvis" — with nothing asked. */
 const BARE_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo)?\\s*${NAME}[\\s,.!?]*$`, 'i')
@@ -100,9 +92,17 @@ export default function App() {
     speaker.current = null
   }
 
+  /** True while Space is held — the only time the microphone is open. */
+  const holding = useRef(false)
+
   const goDormant = () => {
     clearIdle()
     silence()
+    // Standing down closes the mic too, mid-hold or not.
+    if (holding.current) {
+      holding.current = false
+      voice.current?.cancel()
+    }
     turn.current++
     const s = store.getState()
     s.setCaption('')
@@ -113,14 +113,16 @@ export default function App() {
     s.setPhase('dormant')
   }
 
-  /** Open the mic and wait. `window` is how long before he gives up. */
-  const listen = (window: number) => {
+  /**
+   * Back to standby after a turn. There is no listening window any more: the
+   * mic used to stay open for a follow-up, which is also when a sniff or a
+   * keystroke became a question. Now it opens only while Space is held.
+   */
+  const standBy = () => {
     clearIdle()
     const s = store.getState()
     s.setCaption('')
-    s.setPhase('listening')
-    sfx.play('listen')
-    idleTimer.current = setTimeout(goDormant, window)
+    s.setPhase('dormant')
   }
 
   // -- one turn -------------------------------------------------------------
@@ -213,61 +215,18 @@ export default function App() {
         music.duck(false)
         store.getState().setActiveTool(null)
         music.working(false)
-        // Stay open. Having to say his name again to add one more sentence is
-        // the difference between a conversation and a vending machine.
-        listen(FOLLOW_UP_MS)
+        // Straight back to standby. A follow-up is one more hold of Space.
+        standBy()
       }
     }
   }
 
-  // -- voice events ---------------------------------------------------------
-
-  /** What the voice loop should do with what it hears, derived from phase. */
-  const mode = (): VoiceMode => {
-    switch (store.getState().phase) {
-      case 'offline':
-      case 'boot':
-        return 'deaf'
-      case 'dormant':
-        return 'wake'
-      case 'waking':
-      case 'listening':
-        return 'command'
-      default:
-        return 'guard' // thinking, tooling, speaking
-    }
-  }
-
-  const onWake = (trailing: string) => {
-    const phase = store.getState().phase
-    if (phase === 'offline' || phase === 'boot') return
-
-    store.getState().setError(null)
-    sfx.play('wake')
-
-    // "Jarvis, what's happening in AI this week" in one breath. Waiting for a
-    // greeting he didn't need is the most common way an assistant wastes time.
-    if (trailing) {
-      void respond(trailing)
-      return
-    }
-
-    store.getState().setPhase('waking')
-
-    // Answer to his name. Deliberately NOT awaited any more: the microphone is
-    // already open and the echo filter knows his voice, so the user can talk
-    // straight over the greeting instead of waiting it out.
-    const greeting = createSpeaker()
-    speaker.current = greeting
-    greeting.say(attention())
-    void greeting.end()
-
-    listen(AWAIT_SPEECH_MS)
-  }
+  // -- voice ----------------------------------------------------------------
 
   /**
-   * Someone started talking. This is the whole point of the rewrite: he stops,
-   * immediately, whatever he was doing.
+   * Cut him off, whatever he was doing. Holding Space while he thinks or
+   * speaks is the barge-in, and a typed line uses it too — both deliberate,
+   * which is why nothing else can trigger it any more.
    */
   const onSpeechStart = () => {
     clearIdle()
@@ -291,19 +250,51 @@ export default function App() {
     store.getState().setPhase('listening')
   }
 
+  /** Space down: open the microphone, cutting him off if he is mid-answer. */
+  const beginHold = () => {
+    const v = voice.current
+    if (!v || holding.current) return
+    holding.current = true
+    store.getState().setError(null)
+    onSpeechStart()
+    // Also stops anything said while idle — a voice demo, the audio test.
+    silence()
+    const s = store.getState()
+    s.setCaption('')
+    s.setPhase('listening')
+    sfx.play('listen')
+    v.hold()
+  }
+
+  /** Space up: close the microphone and send what was said. */
+  const endHold = () => {
+    if (!holding.current) return
+    holding.current = false
+    store.getState().setPhase('thinking')
+    voice.current?.release()
+  }
+
+  /** Focus went elsewhere mid-hold, so the release will never arrive here.
+   *  Throw the hold away rather than leave the microphone open. */
+  const cancelHold = () => {
+    if (!holding.current) return
+    holding.current = false
+    voice.current?.cancel()
+    standBy()
+  }
+
   const onUtterance = (text: string) => {
     const phase = store.getState().phase
-    if (phase === 'offline' || phase === 'boot' || phase === 'dormant') return
+    if (phase === 'offline' || phase === 'boot') return
+    // A newer hold is already open, and that one owns the turn.
+    if (holding.current) return
 
-    // People keep using his name as a vocative once they're already talking to
-    // him. Strip it rather than sending "jarvis" to the model as a question.
-    if (BARE_NAME.test(text)) {
-      listen(AWAIT_SPEECH_MS)
-      return
-    }
+    // People still address him by name. Strip it rather than sending "jarvis"
+    // to the model as the question. Nothing left — a tap, silence, or only his
+    // name — goes back to standby.
     const said = text.replace(LEADING_NAME, '').trim()
-    if (!said) {
-      listen(AWAIT_SPEECH_MS)
+    if (!said || BARE_NAME.test(text)) {
+      standBy()
       return
     }
 
@@ -537,10 +528,9 @@ export default function App() {
     await probeCapabilities()
 
     // One voice loop, started once, running until the page closes.
+    // Hold-to-talk: the engine starts with the microphone closed, and Space
+    // is the only thing that opens it.
     voice.current = await startVoice({
-      mode,
-      onWake,
-      onSpeechStart,
       onPartial,
       onUtterance,
       onError: onVoiceError,
@@ -681,32 +671,42 @@ export default function App() {
         return
       }
 
-      // Space starts a turn without the wake word. Worth using while filming so
-      // a missed wake word doesn't cost a take.
-      if (e.code !== 'Space' || e.repeat) return
+      // Space is the microphone: held, it is open; released, what was said is
+      // sent. Before power-up it is the ignition key instead.
+      if (e.code !== 'Space') return
       e.preventDefault()
+      if (e.repeat) return
 
       const phase = store.getState().phase
       if (phase === 'offline') {
         void powerOn()
       } else if (phase === 'boot') {
         /* ignore — the boot sequence owns the phase until it finishes */
-      } else if (
-        phase === 'thinking' ||
-        phase === 'tooling' ||
-        phase === 'speaking'
-      ) {
-        onSpeechStart()
-        listen(AWAIT_SPEECH_MS)
       } else {
-        onWake('')
+        beginHold()
       }
     }
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') e.preventDefault()
+      endHold()
+    }
+
+    // A Space released in another window never arrives here, so a hold still
+    // open when focus leaves is thrown away rather than left recording.
+    const onBlur = () => cancelHold()
+
     window.addEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
 
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
       clearIdle()
       if (voicePoll.current) clearInterval(voicePoll.current)
       voice.current?.stop()
