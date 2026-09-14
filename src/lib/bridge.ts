@@ -149,6 +149,42 @@ export function watchWatchlist(fn: (data: unknown) => void) {
   onWatchlist = fn
 }
 
+/** Something the bridge thinks is worth saying unprompted (alerts.mjs). */
+export type Nudge = {
+  kind: 'calendar' | 'market' | 'news' | 'quake' | 'briefing'
+  /** The sentence to say — everything but the briefing. */
+  text?: string
+  /** The briefing's prompt, for a real turn. */
+  prompt?: string
+  /** Quiet hours: show it, don't say it. */
+  quiet?: boolean
+}
+let onNudge: ((n: Nudge) => void) | null = null
+export function watchNudges(fn: (n: Nudge) => void) {
+  onNudge = fn
+}
+
+/** The resumed conversation's recent lines, sent once on connect to the face
+ *  that holds the thread (memory.mjs). */
+export type ThreadTurn = { role: 'user' | 'jarvis'; text: string; tag?: 'alert' | 'briefing' }
+type ThreadInfo = { resumed: boolean; turns: ThreadTurn[] }
+let onThread: ((t: ThreadInfo) => void) | null = null
+export function watchThread(fn: (t: ThreadInfo) => void) {
+  onThread = fn
+}
+
+type AlertStatus = { enabled: boolean; quiet: boolean }
+let onAlerts: ((a: AlertStatus) => void) | null = null
+export function watchAlerts(fn: (a: AlertStatus) => void) {
+  onAlerts = fn
+}
+
+/** Tell the bridge what was just said unprompted: the next question carries
+ *  it for context, and the saved thread keeps it. */
+export function note(text: string): void {
+  if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'note', text }))
+}
+
 /**
  * Connection state, for the UI.
  *
@@ -276,6 +312,20 @@ function dispatch(ws: WebSocket) {
     } else if (msg.type === 'watchlist') {
       const data = (msg as unknown as { data?: unknown }).data
       if (data) onWatchlist?.(data)
+    } else if (msg.type === 'nudge') {
+      const n = (msg as unknown as { nudge?: Nudge }).nudge
+      if (n && typeof n.kind === 'string') onNudge?.(n)
+    } else if (msg.type === 'thread') {
+      const t = msg as unknown as { resumed?: boolean; turns?: ThreadTurn[] }
+      onThread?.({
+        resumed: t.resumed === true,
+        turns: (Array.isArray(t.turns) ? t.turns : []).filter(
+          (x) => x && (x.role === 'user' || x.role === 'jarvis') && typeof x.text === 'string',
+        ),
+      })
+    } else if (msg.type === 'alerts') {
+      const a = (msg as unknown as { data?: Partial<AlertStatus> }).data
+      if (a) onAlerts?.({ enabled: a.enabled !== false, quiet: a.quiet === true })
     }
   })
 }
@@ -385,6 +435,9 @@ let pending: { finish: (fallback?: string) => void } | null = null
 export async function ask(
   prompt: string,
   handlers: AskHandlers,
+  /** shown: what the user said, for the saved thread (null for a prompt the
+   *  interface sent itself). tag: marks the answer, e.g. 'briefing'. */
+  opts: { shown?: string | null; tag?: string } = {},
 ): Promise<{ text: string; tools: string[] }> {
   /**
    * A new question supersedes the one in flight.
@@ -538,7 +591,7 @@ export async function ask(
     arm()
 
     try {
-      ws.send(JSON.stringify({ type: 'ask', text: prompt, id }))
+      ws.send(JSON.stringify({ type: 'ask', text: prompt, id, shown: opts.shown, tag: opts.tag }))
     } catch (err) {
       // The socket can go into CLOSING between connect() resolving and here.
       fail(err instanceof Error ? err : new Error(String(err)))

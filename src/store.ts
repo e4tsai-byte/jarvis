@@ -61,6 +61,8 @@ export type Turn = {
   text: string
   /** Tool names invoked while producing this turn, for the HUD readout. */
   tools?: string[]
+  /** Something he said unprompted, or the morning briefing. */
+  tag?: 'alert' | 'briefing'
 }
 
 /**
@@ -267,6 +269,9 @@ type State = {
   /** The saved watchlist, the hub's range and which stocks Compare draws —
    *  the bridge's copy, pushed on connect and after every change. */
   watchlist: { symbols: string[]; range: Range; compare: string[] }
+  /** Whether he may speak up unprompted right now (alerts.mjs): off, on, or
+   *  inside quiet hours. null until the bridge says. */
+  alerts: { enabled: boolean; quiet: boolean } | null
   /** Next events and unread mail, from the bridge's background refresh. */
   personal: {
     at: number
@@ -293,6 +298,8 @@ type State = {
   setWorld: (linked: boolean | null) => void
   setLayout: (layout: 'dash' | 'world' | 'media') => void
   setWatchlist: (watchlist: State['watchlist']) => void
+  setAlerts: (alerts: State['alerts']) => void
+  setTurns: (turns: Turn[]) => void
   setReactorFrame: (frame: State['reactorFrame']) => void
   setMedia: (patch: Partial<State['media']>) => void
   setPersonal: (personal: State['personal']) => void
@@ -350,6 +357,7 @@ export const useStore = create<State>((set) => ({
     oneOff: [],
     liveView: 'wall',
   },
+  alerts: null,
   // The bridge's defaults, until its own copy arrives over the socket.
   watchlist: {
     symbols: ['NVDA', 'AAPL', 'SPY', 'BTC-USD'],
@@ -378,6 +386,8 @@ export const useStore = create<State>((set) => ({
         layout === 'world' && s.layout !== 'world' ? (s.layout === 'media' ? 'media' : 'dash') : s.layoutBack,
     })),
   setWatchlist: (watchlist) => set({ watchlist }),
+  setAlerts: (alerts) => set({ alerts }),
+  setTurns: (turns) => set({ turns }),
   setReactorFrame: (reactorFrame) => set({ reactorFrame }),
   setMedia: (patch) => set((s) => ({ media: { ...s.media, ...patch } })),
   setPersonal: (personal) => set({ personal }),

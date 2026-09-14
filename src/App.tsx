@@ -30,6 +30,11 @@ import {
   watchMedia,
   watchPersonal,
   watchWatchlist,
+  watchNudges,
+  watchThread,
+  watchAlerts,
+  note,
+  type Nudge,
   watchConnection,
   connectedLabels,
   usingBridge,
@@ -131,7 +136,12 @@ export default function App() {
 
   // -- one turn -------------------------------------------------------------
 
-  const respond = async (said: string): Promise<void> => {
+  /**
+   * One turn. `hidden` is a prompt the interface sends on its own — the
+   * morning briefing — which puts his answer on screen with no "YOU" line;
+   * `tag` labels that answer.
+   */
+  const respond = async (said: string, opts: { hidden?: boolean; tag?: 'briefing' } = {}): Promise<void> => {
     const mine = ++turn.current
     const stale = () => mine !== turn.current
 
@@ -142,7 +152,7 @@ export default function App() {
     s.clearPanels()
     s.clearBlades()
     s.setCaption('')
-    s.pushTurn({ id: newId(), role: 'user', text: said })
+    if (!opts.hidden) s.pushTurn({ id: newId(), role: 'user', text: said })
     s.setPhase('thinking')
 
     const spk = createSpeaker()
@@ -165,7 +175,7 @@ export default function App() {
             // clear the readout while a slow tool was still running.
             store.getState().setActiveTool(null)
             music.working(false)
-            store.getState().pushTurn({ id: turnId, role: 'jarvis', text: '' })
+            store.getState().pushTurn({ id: turnId, role: 'jarvis', text: '', tag: opts.tag })
           }
           store.getState().appendToLastTurn(delta)
           spk.push(delta)
@@ -188,7 +198,7 @@ export default function App() {
             spk.say(forTool(name))
           }
         },
-      })
+      }, { shown: opts.hidden ? null : said, tag: opts.tag })
 
       if (stale()) return
 
@@ -494,6 +504,23 @@ export default function App() {
     watchWatchlist((data) =>
       store.getState().setWatchlist(data as ReturnType<typeof store.getState>['watchlist']),
     )
+    // Things to say unprompted, held until he can (see "speaking first"), and
+    // whether he may right now.
+    watchNudges((n) => {
+      nudges.current.push(n)
+    })
+    watchAlerts((data) => store.getState().setAlerts(data))
+    // The conversation so far, when the bridge resumed it: back on screen for
+    // a freshly loaded page, and the reconnect notice put right.
+    watchThread(({ resumed, turns }) => {
+      const s = store.getState()
+      if (turns.length && s.turns.length === 0) {
+        s.setTurns(turns.map((t) => ({ id: newId(), role: t.role, text: t.text, tag: t.tag })))
+      }
+      if (resumed && s.error?.startsWith('Bridge reconnected')) {
+        s.setError('Bridge reconnected — the conversation carries on.')
+      }
+    })
     watchConnection((state) => {
       if (state === 'lost') {
         store.getState().setError('Bridge connection lost — reconnecting.')
@@ -601,6 +628,61 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase])
+
+  // -- speaking first --------------------------------------------------------
+
+  /**
+   * Alerts from the bridge wait here until he can say them: not while the
+   * user holds Space, not while he is thinking or speaking, and not until he
+   * has been quiet for a moment. Simple ones he says from the bridge's own
+   * sentence — several waiting are said together — and they go back to the
+   * bridge as a note, so a follow-up question knows what was said. The
+   * morning briefing is a real turn. A quiet-hours alert goes on screen only.
+   */
+  const nudges = useRef<Nudge[]>([])
+  const idleSince = useRef(0)
+
+  useEffect(() => {
+    const unsub = useStore.subscribe((st, prev) => {
+      if (st.phase === 'dormant' && prev.phase !== 'dormant') idleSince.current = Date.now()
+    })
+    const id = window.setInterval(() => {
+      const s = store.getState()
+      if (!nudges.current.length || s.phase !== 'dormant' || holding.current) return
+      if (Date.now() - idleSince.current < 2500) return
+
+      if (nudges.current[0].kind === 'briefing') {
+        const [briefing] = nudges.current.splice(0, 1)
+        if (briefing.prompt) void respond(briefing.prompt, { hidden: true, tag: 'briefing' })
+        return
+      }
+      const batch = nudges.current.filter((n) => n.kind !== 'briefing' && n.text)
+      nudges.current = nudges.current.filter((n) => n.kind === 'briefing')
+      if (!batch.length) return
+      const text = batch.map((n) => n.text).join(' ')
+      s.pushTurn({ id: newId(), role: 'jarvis', text, tag: 'alert' })
+      note(text)
+      if (batch.every((n) => n.quiet)) return
+
+      silence()
+      const spk = createSpeaker()
+      speaker.current = spk
+      sfx.play('tool')
+      s.setPhase('speaking')
+      spk.say(text)
+      void spk.end().then(() => {
+        // Cut off by a hold of Space, which has already taken the phase.
+        if (speaker.current !== spk) return
+        speaker.current = null
+        standBy()
+      })
+    }, 1000)
+    return () => {
+      unsub()
+      window.clearInterval(id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // -- level pump + keys ----------------------------------------------------
 

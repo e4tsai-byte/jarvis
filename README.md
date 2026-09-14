@@ -245,6 +245,48 @@ Ask for any of it: *"Put Sky News on."* · *"Put all the news channels up."* ·
 the month, full screen."* · *"Add Tesla to my watchlist."* · *"Any headlines
 about Ukraine?"* · *"How's Bitcoin doing?"*
 
+### Memory
+
+JARVIS keeps two things between conversations, both plain JSON in `~/.jarvis/`
+that you can read, edit or delete yourself:
+
+- **What he knows about you** — `memory.json`. When you mention something
+  lasting (a preference, a person, a routine, a project, where you live) or say
+  *"remember…"*, he saves it as one short sentence, and every new conversation
+  starts with it. *"What do you know about me?"* lists it; *"Forget that I…"*
+  removes it. Anything that looks like a password, key or card number is
+  refused.
+- **The conversation itself** — `thread.json`. Reloading the page, a dropped
+  connection or restarting the bridge picks up the same conversation, with its
+  recent lines back on screen, as long as it was less than 12 hours ago; after
+  that he starts fresh (still remembering you). Only one window holds the
+  conversation: a second window opened alongside gets a fresh one.
+
+### Speaking first
+
+He speaks up on his own when something matters, and never while you are
+talking or he is:
+
+- **Calendar** — *"Sir, the design review starts in 10 minutes."*
+- **Markets** — a watchlist stock moving 3% or more on the day, and again at
+  each further 3%.
+- **News** — a new story on a topic you follow: *"Follow news about Nvidia."*
+- **Earthquakes** — magnitude 4.5+ within 300 km of home, or 5.5+ within
+  1,000 km, from the USGS feed. Tell him where home is first: *"My home is
+  Taipei."*
+- **The morning briefing** — at 08:00, or the first time the dash is open in
+  the four hours after: today's calendar, unread mail, the watchlist and the
+  headline worth knowing, in a few sentences.
+
+Quiet hours are 22:00–08:00: alerts still appear in the conversation, marked
+**ALERT**, but he keeps them to himself. The **ALERTS** chip at the top shows
+ON, QUIET or OFF. Everything is set by asking: *"Quiet hours from 11 to 7."* ·
+*"Brief me at 7:30."* · *"Only tell me about moves over 5 percent."* · *"Stop
+the market alerts."* · *"No alerts today."* · *"Anything I should know?"* The
+settings, and what has already been said, are in `~/.jarvis/alerts.json`.
+Simple alerts cost nothing — the face speaks the bridge's own sentence; the
+briefing is one ordinary turn a day.
+
 ### JARVIS sees the world
 
 With [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (GEV)
@@ -323,8 +365,11 @@ Everything is optional in bridge mode. Frontend settings live in `.env.local`
 | Variable | Default | Effect |
 |---|---|---|
 | `JARVIS_BRIDGE_PORT` | `8787` | Port for the WebSocket + HTTP endpoints |
-| `JARVIS_MODEL` | `claude-opus-5` | Model to run |
-| `JARVIS_EFFORT` | `medium` | Reasoning effort |
+| `JARVIS_MODEL` | `claude-opus-5` | Model for anything that needs thought |
+| `JARVIS_EFFORT` | `high` | Its reasoning effort |
+| `JARVIS_FAST_MODEL` | `claude-sonnet-5` | Model for commands and small talk (below) |
+| `JARVIS_FAST_EFFORT` | `low` | Its reasoning effort |
+| `JARVIS_ROUTER` | on | `0` sends every turn to `JARVIS_MODEL` |
 | `JARVIS_ALLOW_WRITES` | off | `1` allows effectful tools (see below) |
 | `JARVIS_ALLOWED_ORIGINS` | local dev | Extra WebSocket origins to accept |
 | `JARVIS_ALLOW_NO_ORIGIN` | off | Accept connections with no `Origin` header |
@@ -334,6 +379,15 @@ Everything is optional in bridge mode. Frontend settings live in `.env.local`
 | `GEV_DIR` | `world/` | Where God's Eye View lives, if not in this repo's `world/` |
 | `GEV_ORIGIN` | `localhost:4173` | Page origins allowed to hold the world link |
 | `JARVIS_PERSONAL_REFRESH_MIN` | `30` | Minutes between the dash's calendar and inbox refreshes; `0` turns them off |
+
+**Two models, one conversation.** A short command to the interface (*"put Sky
+on"*, *"show me Nvidia"*, *"mute it"*), small talk, or a quick lookup runs on
+`JARVIS_FAST_MODEL` at low effort. Anything that asks him to think, write,
+look, advise, or touch your calendar and mail stays on `JARVIS_MODEL`, and so
+does anything the rules in `bridge/router.mjs` are unsure about. The switch
+happens between turns inside the one session, so nothing is forgotten across
+it. Each message also carries the local time, so *"what time is it?"* needs no
+tool. The bridge logs every turn's model, time and cache use.
 
 ### Frontend (`.env.local`)
 

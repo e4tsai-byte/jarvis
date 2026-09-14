@@ -183,6 +183,7 @@ export function Dash() {
   const world = useStore((s) => s.world)
   const connected = useStore((s) => s.connected)
   const personal = useStore((s) => s.personal)
+  const alerts = useStore((s) => s.alerts)
   const root = useRef<HTMLDivElement>(null)
   const [stats, setStats] = useState<Telemetry | null>(null)
   const [traffic, setTraffic] = useState<number[]>([])
@@ -360,6 +361,14 @@ export function Dash() {
         <span className={`dash-chip${phase === 'listening' ? ' on hot' : ''}`}>
           MIC · {phase === 'listening' ? 'OPEN' : 'CLOSED'}
         </span>
+        {alerts && (
+          <span
+            className={`dash-chip${alerts.enabled && !alerts.quiet ? ' on' : ''}`}
+            title="Whether JARVIS speaks up unprompted. Ask him to change it."
+          >
+            ALERTS · {!alerts.enabled ? 'OFF' : alerts.quiet ? 'QUIET' : 'ON'}
+          </span>
+        )}
         <time className="dash-clock">
           {clock.toLocaleDateString([], { month: 'short', day: 'numeric' })}
           {' · '}
@@ -670,8 +679,8 @@ function Conversation() {
         <p className="dash-empty">{shown ? 'Nothing said yet.' : 'Transcript hidden.'}</p>
       ) : (
         turns.map((t) => (
-          <div key={t.id} className={`log-line log-${t.role}`}>
-            <span className="log-who">{t.role === 'user' ? 'YOU' : 'JARVIS'}</span>
+          <div key={t.id} className={`log-line log-${t.role}${t.tag ? ' log-tagged' : ''}`}>
+            <span className="log-who">{t.role === 'user' ? 'YOU' : t.tag ? t.tag.toUpperCase() : 'JARVIS'}</span>
             <span className="log-text">{t.role === 'jarvis' ? <DecodeText text={t.text} /> : t.text}</span>
           </div>
         ))

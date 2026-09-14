@@ -582,6 +582,14 @@
 /* Newest at the bottom while there are only a few lines. */
 .dash-convo-list > :first-child { margin-top: auto; }
 .dash-convo-list .log-line { font-size: 13px; }
+/* His unprompted lines are labelled for what they were — ALERT, BRIEFING —
+   in the phase colour, wide enough for the longer label. */
+.dash-convo-list .log-who { flex-basis: 66px; }
+.dash .log-tagged .log-who,
+.hud .log-tag {
+  opacity: 1;
+}
+.dash .log-tagged .log-who { color: var(--phase); }
 
 /* Room for the typing bar under the last line while it is open. */
 html:has(.typebar) .dash-convo-list { padding-bottom: 56px; }

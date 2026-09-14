@@ -5,7 +5,7 @@ import type { AskHandlers, Msg } from './anthropic'
 import type { Blade, Panel } from '../store'
 
 export type { AskHandlers, Msg }
-export type { ConnectionState } from './bridge'
+export type { ConnectionState, Nudge } from './bridge'
 
 /**
  * Picks the brain. Both backends answer a question and stream text and tool
@@ -28,9 +28,10 @@ export async function ask(
   prompt: string,
   history: Msg[],
   handlers: AskHandlers,
+  opts: { shown?: string | null; tag?: string } = {},
 ): Promise<{ text: string; tools: string[] }> {
   return usingBridge
-    ? bridge.ask(prompt, handlers)
+    ? bridge.ask(prompt, handlers, opts)
     : direct.ask([...history, { role: 'user', content: prompt }], handlers)
 }
 
@@ -92,6 +93,26 @@ export function watchPersonal(fn: (data: unknown) => void): void {
 /** The saved watchlist and the hub's range, from the bridge. */
 export function watchWatchlist(fn: (data: unknown) => void): void {
   if (usingBridge) bridge.watchWatchlist(fn)
+}
+
+/** Things the bridge thinks worth saying unprompted. */
+export function watchNudges(fn: Parameters<typeof bridge.watchNudges>[0]): void {
+  if (usingBridge) bridge.watchNudges(fn)
+}
+
+/** The conversation the bridge resumed, if any. */
+export function watchThread(fn: Parameters<typeof bridge.watchThread>[0]): void {
+  if (usingBridge) bridge.watchThread(fn)
+}
+
+/** Whether he may speak up unprompted right now. */
+export function watchAlerts(fn: Parameters<typeof bridge.watchAlerts>[0]): void {
+  if (usingBridge) bridge.watchAlerts(fn)
+}
+
+/** What he just said unprompted, for the bridge. */
+export function note(text: string): void {
+  if (usingBridge) bridge.note(text)
 }
 
 /**
