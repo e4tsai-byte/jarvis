@@ -51,6 +51,48 @@ const ORB_CLIP_VH = 0.3
 /** Network samples in the traffic trace: a minute, at one every two seconds. */
 const TRAFFIC_SAMPLES = 30
 
+/**
+ * Where the user has dragged each readout, as an offset from its own place in
+ * the layout. A per-browser convenience, so localStorage: a private window or
+ * cleared site data simply starts from the default layout.
+ */
+type Offsets = Record<string, [number, number]>
+const OFFSETS_KEY = 'jarvis.readouts'
+const MOVE_HINT = 'Drag to move · double-click to put back'
+
+function loadOffsets(): Offsets {
+  try {
+    const saved = JSON.parse(localStorage.getItem(OFFSETS_KEY) ?? '{}')
+    return saved && typeof saved === 'object' ? saved : {}
+  } catch {
+    return {}
+  }
+}
+function saveOffsets(offsets: Offsets) {
+  try {
+    localStorage.setItem(OFFSETS_KEY, JSON.stringify(offsets))
+  } catch {
+    /* not remembered this time; the layout still moved */
+  }
+}
+/** Tells the traces to re-route: a transform moves a readout without
+ *  resizing anything, so no observer would notice. */
+const relayout = (): void => {
+  // Returns nothing on purpose: it is also an effect, and anything an effect
+  // returns React will try to call as its cleanup.
+  window.dispatchEvent(new Event('jarvis:readouts'))
+}
+
+/** An offset that keeps a readout, whose undragged box is `base`, on screen. */
+function clampTo(base: DOMRect, x: number, y: number): [number, number] {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  return [
+    Math.round(Math.min(vw - 4 - base.right, Math.max(4 - base.left, x))),
+    Math.round(Math.min(vh - 4 - base.bottom, Math.max(4 - base.top, y))),
+  ]
+}
+
 const gb = (bytes: number) => (bytes / 1024 ** 3).toFixed(1)
 const rate = (bps: number) =>
   bps >= 1024 ** 2 ? `${(bps / 1024 ** 2).toFixed(1)} MB/s` : `${Math.round(bps / 1024)} KB/s`
@@ -150,6 +192,101 @@ export function Dash() {
   // The traces carry light while he is doing something.
   const busy = phase === 'thinking' || phase === 'tooling' || phase === 'speaking'
 
+  // Readouts the user has moved. While a drag is live the element is moved
+  // directly, frame by frame; the state only takes the final position.
+  const [offsets, setOffsets] = useState<Offsets>(loadOffsets)
+  const drag = useRef<{ el: HTMLElement; name: string; x0: number; y0: number; ox: number; oy: number; base: DOMRect } | null>(
+    null,
+  )
+  const place = (name: string) => {
+    const o = offsets[name]
+    return o ? { translate: `${o[0]}px ${o[1]}px` } : undefined
+  }
+  const commit = (update: (prev: Offsets) => Offsets) =>
+    setOffsets((prev) => {
+      const next = update(prev)
+      saveOffsets(next)
+      return next
+    })
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-drag]')
+    const name = el?.dataset.anchor
+    if (!el || !name) return
+    const [ox, oy] = offsets[name] ?? [0, 0]
+    const r = el.getBoundingClientRect()
+    drag.current = { el, name, x0: e.clientX, y0: e.clientY, ox, oy, base: new DOMRect(r.left - ox, r.top - oy, r.width, r.height) }
+    el.setPointerCapture(e.pointerId)
+    el.classList.add('is-dragging')
+    e.preventDefault()
+  }
+  const dragTo = (e: React.PointerEvent) => {
+    const d = drag.current
+    return d ? clampTo(d.base, d.ox + e.clientX - d.x0, d.oy + e.clientY - d.y0) : null
+  }
+  const onPointerMove = (e: React.PointerEvent) => {
+    const at = dragTo(e)
+    if (!at || !drag.current) return
+    drag.current.el.style.translate = `${at[0]}px ${at[1]}px`
+    relayout()
+  }
+  // Two clicks on the same readout, without moving it, put it back where the
+  // layout had it. Counted here rather than left to dblclick, which Chrome
+  // does not send once pointerdown has been cancelled — as it is above.
+  const lastTap = useRef<{ name: string; at: number } | null>(null)
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = drag.current
+    const at = dragTo(e)
+    if (!d || !at) return
+    drag.current = null
+    d.el.classList.remove('is-dragging')
+    if (Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) < 4) {
+      const now = performance.now()
+      if (lastTap.current?.name === d.name && now - lastTap.current.at < 400) {
+        lastTap.current = null
+        commit((prev) => {
+          const next = { ...prev }
+          delete next[d.name]
+          return next
+        })
+      } else {
+        lastTap.current = { name: d.name, at: now }
+      }
+      return
+    }
+    lastTap.current = null
+    commit((prev) => ({ ...prev, [d.name]: at }))
+  }
+
+  // Once React has placed them, the traces follow.
+  useEffect(relayout, [offsets])
+
+  // A smaller window must not strand a readout off screen.
+  useEffect(() => {
+    const fit = () =>
+      setOffsets((prev) => {
+        let changed = false
+        const next = { ...prev }
+        for (const [name, [x, y]] of Object.entries(prev)) {
+          const el = root.current?.querySelector<HTMLElement>(`[data-drag][data-anchor="${name}"]`)
+          if (!el) continue
+          const r = el.getBoundingClientRect()
+          const [cx, cy] = clampTo(new DOMRect(r.left - x, r.top - y, r.width, r.height), x, y)
+          if (cx !== x || cy !== y) {
+            next[name] = [cx, cy]
+            changed = true
+          }
+        }
+        if (!changed) return prev
+        saveOffsets(next)
+        return next
+      })
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [])
+
   useEffect(() => {
     measure()
     const ro = new ResizeObserver(measure)
@@ -230,27 +367,34 @@ export function Dash() {
         </time>
       </header>
 
-      <section className="dash-jarvis" data-slot="jarvis">
+      <section
+        className="dash-jarvis"
+        data-slot="jarvis"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         <Traces />
 
         <div className="dash-row-top">
-          <div data-anchor="cpu">
+          <div data-anchor="cpu" data-drag style={place('cpu')} title={MOVE_HINT}>
             <Ring value={(stats?.cpu ?? 0) / 100} label="CPU" reading={stats ? `${stats.cpu}%` : '—'} />
           </div>
-          <div className="dash-traffic" data-anchor="traffic">
+          <div className="dash-traffic" data-anchor="traffic" data-drag style={place('traffic')} title={MOVE_HINT}>
             <Traffic samples={traffic} />
           </div>
-          <div data-anchor="mem">
+          <div data-anchor="mem" data-drag style={place('mem')} title={MOVE_HINT}>
             <Ring value={memPct / 100} label="Memory" reading={stats ? `${memPct}%` : '—'} />
           </div>
         </div>
 
         <aside className="dash-flank dash-flank-left">
-          <section className="dash-block" data-anchor="today">
+          <section className="dash-block" data-anchor="today" data-drag style={place('today')} title={MOVE_HINT}>
             <h3 className="dash-title">Today</h3>
             <Events personal={personal} />
           </section>
-          <section className="dash-block" data-anchor="inbox">
+          <section className="dash-block" data-anchor="inbox" data-drag style={place('inbox')} title={MOVE_HINT}>
             <h3 className="dash-title">Inbox{personal?.unread ? ` · ${personal.unread.count} unread` : ''}</h3>
             <Inbox personal={personal} />
           </section>
@@ -271,7 +415,7 @@ export function Dash() {
         </div>
 
         <aside className="dash-flank dash-flank-right">
-          <section className="dash-block" data-anchor="machine">
+          <section className="dash-block" data-anchor="machine" data-drag style={place('machine')} title={MOVE_HINT}>
             <h3 className="dash-title">Machine</h3>
             <dl className="dash-readout">
               <div>
@@ -288,7 +432,7 @@ export function Dash() {
               </div>
             </dl>
           </section>
-          <section className="dash-block" data-anchor="link">
+          <section className="dash-block" data-anchor="link" data-drag style={place('link')} title={MOVE_HINT}>
             <h3 className="dash-title">Link</h3>
             <dl className="dash-readout">
               <div>
@@ -310,6 +454,11 @@ export function Dash() {
         <div className="dash-convo" data-slot="convo">
           <div className="dash-convo-head">
             <h3 className="dash-title">Conversation</h3>
+            {Object.keys(offsets).length > 0 && (
+              <button type="button" className="dash-reset" onClick={() => commit(() => ({}))}>
+                Reset readouts
+              </button>
+            )}
             <span className="dash-hint">hold Space to talk · Enter to type</span>
           </div>
           <Conversation />
@@ -411,24 +560,30 @@ function Traces() {
         })
       }
 
-      for (const name of ['cpu', 'traffic', 'mem']) {
-        const a = at(name)
-        if (a) flow((a.l + a.r) / 2, a.b + 6, [0, -1])
-      }
-      // The flanks sit nearly level with the orb, so their runs leave about
-      // 20° further up or down than straight at them — up for the groups
-      // above its middle, down for those below — and sweep round in.
-      const side = (name: string, left: boolean) => {
+      // Each run lands on whichever side of its readout faces the orb, so a
+      // readout dragged anywhere is still met head-on rather than looped
+      // around. Beside the orb, that is the near edge at the title line —
+      // where a group's own hairline starts — and the run leaves about 20°
+      // above or below level, so it sweeps in rather than lying flat. Above
+      // or below the orb, it is the near edge's middle.
+      const toward = (name: string) => {
         const a = at(name)
         if (!a) return
-        const ty = a.t + 5
-        const bend = 0.35 * Math.sign(ty - cy) * (left ? -1 : 1)
-        flow(left ? a.r + 4 : a.l - 8, ty, [left ? -1 : 1, 0], bend)
+        const ax = (a.l + a.r) / 2
+        const ay = (a.t + a.b) / 2
+        const dx = ax - cx
+        const dy = ay - cy
+        if (Math.abs(dx) * 0.8 > Math.abs(dy)) {
+          const left = dx < 0
+          const titled = Boolean(el.querySelector(`[data-anchor="${name}"] .dash-title`))
+          const ty = titled ? a.t + 5 : ay
+          flow(left ? a.r + 4 : a.l - 8, ty, [left ? -1 : 1, 0], 0.35 * Math.sign(ty - cy) * (left ? -1 : 1))
+        } else {
+          const above = dy < 0
+          flow(ax, above ? a.b + 6 : a.t - 6, [0, above ? -1 : 1])
+        }
       }
-      side('today', true)
-      side('inbox', true)
-      side('machine', false)
-      side('link', false)
+      for (const name of ['cpu', 'traffic', 'mem', 'today', 'inbox', 'machine', 'link']) toward(name)
 
       const key = next.map((t) => t.d).join('|')
       if (key !== drawn.current) {
@@ -442,7 +597,12 @@ function Traces() {
     const ro = new ResizeObserver(draw)
     ro.observe(el)
     el.querySelectorAll('[data-anchor], [data-slot="reactor"]').forEach((n) => ro.observe(n))
-    return () => ro.disconnect()
+    // A dragged readout moves by transform, which no observer sees.
+    window.addEventListener('jarvis:readouts', draw)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('jarvis:readouts', draw)
+    }
   }, [])
 
   return (

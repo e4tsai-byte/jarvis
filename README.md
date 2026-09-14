@@ -200,6 +200,9 @@ field: the reactor's dust and glow fill it and fade into the right-hand column.
 The orb floats at its centre, with its name and status above it and your
 voice as a waveform below. Traces flow out of the orb to every readout, and
 light pulses along them while JARVIS is thinking, using a tool or speaking.
+Drag any readout wherever you like and its trace follows; the layout is
+remembered in this browser. Double-click a readout to put it back, or **Reset
+readouts** puts them all back.
 
 - **Top row** — CPU and memory rings and a minute of network traffic, read by
   the bridge every two seconds while the dash is showing.
