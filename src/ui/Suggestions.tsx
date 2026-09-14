@@ -42,7 +42,7 @@ export function Suggestions() {
 
   return (
     <div className="suggest">
-      <span className="suggest-lead">try</span>
+      <span className="suggest-lead">hold space · try</span>
       <AnimatePresence mode="wait">
         <motion.span
           key={i}
@@ -52,7 +52,7 @@ export function Suggestions() {
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.35 }}
         >
-          “hey jarvis, {EXAMPLES[i]}”
+          “{EXAMPLES[i]}”
         </motion.span>
       </AnimatePresence>
     </div>

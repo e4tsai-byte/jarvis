@@ -1,7 +1,7 @@
 # J.A.R.V.I.S.
 
-A browser voice assistant with an Iron Man holographic interface. Say
-**"Hey Jarvis"**, he wakes, listens, and does real things through your tools —
+A browser voice assistant with an Iron Man holographic interface. Hold
+**Space** and talk, and he does real things through your tools —
 searches the web, generates images, drives your phone, reads your mail. The face
 is a web page (React + Vite + Three.js + custom GLSL). The brain is Claude Code,
 run headless as a library.
@@ -49,7 +49,7 @@ npm install
 npm start          # runs the brain and the face together
 ```
 
-Then open the URL it prints (http://localhost:5173) in **Chrome**, click **INITIALISE**, and say **“Hey Jarvis”**.
+Then open the URL it prints (http://localhost:5173) in **Chrome**, click **INITIALISE**, and hold **Space** to talk.
 
 Prefer two terminals? Run them separately instead:
 
@@ -75,7 +75,7 @@ Then open the app in a **real Chrome or Edge window**:
 open http://localhost:5173
 ```
 
-Click **INITIALISE**, allow the microphone when asked, and say **"Hey Jarvis"**.
+Click **INITIALISE**, allow the microphone when asked, and hold **Space** to talk.
 
 > It has to be a real browser window. Embedded preview panes block the
 > microphone, so JARVIS will look perfectly alive and simply never respond.
@@ -89,8 +89,8 @@ the brain and the hands.
 
 ```
   ┌─ browser (the face) ───────────────┐        ┌─ bridge (the brain) ─────────────┐
-  │  "Hey Jarvis" wake word            │        │  Node · bridge/server.mjs        │
-  │  local VAD  →  speech to text      │   ws   │  Claude Agent SDK                │
+  │  hold Space to talk                │        │  Node · bridge/server.mjs        │
+  │  hold → clip → speech to text      │   ws   │  Claude Agent SDK                │
   │  reactor UI (Three.js + GLSL)      │◄─────► │   = Claude Code, headless        │
   │  text to speech                    │  8787  │  spawns your MCP servers         │
   │  heads-up display                  │        │  permission gate (decideTool)    │
@@ -114,17 +114,21 @@ prints its choice, e.g. `[jarvis] model claude-opus-5 · effort medium`.
 
 ### The voice pipeline
 
-The loop is designed so that nothing silently dies and barge-in feels natural.
+The microphone is hold-to-talk, and closed the rest of the time.
 
-- **Detection is local.** An energy-based voice-activity detector
-  (`src/lib/vad.ts`) decides when you are speaking. It is instant, cannot quietly
-  fail, and is what makes **barge-in** work — speak while JARVIS is talking and he
-  stops.
+- **Hold Space to talk; release to send.** The audio track is disabled whenever
+  Space is up, so nothing is transcribed and nothing counts as an interruption —
+  a sniff, a keyboard or the room cannot cut JARVIS off or turn into a question.
+  Holding Space while he speaks is the one way to interrupt him. Taps shorter
+  than about a third of a second are ignored. (The clap that powers him on is
+  separate, and only listens before he is on.)
 - **Transcription has two tiers, chosen automatically at boot.** The browser asks
   the bridge `/health` and picks the best available:
-  - **ElevenLabs key present** → ElevenLabs Scribe, via the bridge `/stt` endpoint.
+  - **ElevenLabs key present** → the whole hold is recorded as one clip and sent
+    to ElevenLabs Scribe via the bridge `/stt` endpoint, so a pause to think
+    never splits a question in two.
   - **Nothing configured** → the browser's own `SpeechRecognition` (Chrome/Edge),
-    guarded by a heartbeat so it recovers when Chrome throttles it.
+    run only while Space is held.
 - **Speaking** uses the **ElevenLabs voice when a key is present**, and the
   browser's `speechSynthesis` otherwise. If a cloud call fails it falls back to
   the browser voice, and if the OS voice itself is broken it latches over to the
@@ -230,11 +234,9 @@ inside JARVIS keeps the link. Design notes and what testing changed:
 
 | Key / phrase | Does |
 |---|---|
-| **"Hey Jarvis"** | Wake him |
-| **Space** | Talk without the wake word |
+| **Space** (hold) | Talk. The microphone is open only while Space is held; release to send. Holding it while he speaks cuts him off |
 | **Enter** | Type instead of speaking (Enter sends, Escape closes) |
 | **W** | Switch between the world view and JARVIS (with God's Eye View running) |
-| Just speak | Interrupt him mid-sentence (barge-in) |
 | **V** | Cycle the browser voice |
 | **Escape** | Stand down |
 | **D** | Live diagnostics panel |
@@ -313,7 +315,7 @@ way instead:
 npm run bridge:writes
 ```
 
-> Read `decideTool()` before you do. *"Hey Jarvis, clean up my downloads folder"*
+> Read `decideTool()` before you do. *"Clean up my downloads folder"*
 > means something rather different with writes enabled.
 
 ---

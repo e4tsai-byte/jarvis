@@ -11,7 +11,7 @@ import { TypeBar } from './TypeBar'
 const statusText: Record<Phase, string> = {
   offline: 'OFFLINE',
   boot: 'INITIALISING',
-  dormant: 'STANDBY — SAY “HEY JARVIS”',
+  dormant: 'STANDBY — HOLD SPACE TO TALK',
   waking: 'ONLINE',
   listening: 'LISTENING',
   thinking: 'PROCESSING',
@@ -324,8 +324,7 @@ export function Hud({ onType }: { onType: (text: string) => void }) {
 
       <footer className="hud-bottom">
         <span className="hint">
-          say <b>“hey jarvis”</b> · <kbd>Space</kbd> to talk · <kbd>Enter</kbd> to
-          type · <kbd>G</kbd> hands
+          hold <kbd>Space</kbd> to talk · <kbd>Enter</kbd> to type · <kbd>G</kbd> hands
           {voice && (
             <>
               {' · '}

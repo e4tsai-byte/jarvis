@@ -3,8 +3,8 @@ import { create } from 'zustand'
 export type Phase =
   | 'offline'   // waiting for the click that unlocks audio
   | 'boot'      // startup sequence
-  | 'dormant'   // powered down, waiting for the wake word
-  | 'waking'    // wake word hit, spin-up animation
+  | 'dormant'   // on and idle: hold Space to talk
+  | 'waking'    // no longer entered since hold-to-talk; kept for the palette
   | 'listening' // capturing speech
   | 'thinking'  // model is generating
   | 'tooling'   // an MCP tool is running
