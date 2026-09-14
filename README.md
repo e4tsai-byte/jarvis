@@ -201,18 +201,28 @@ frame.
    (`e4tsai-byte/gods-eye-view`) next to this repo, at `~/Github/gods-eye-view`
    or wherever `GEV_DIR` points, then `npm ci` in it. GEV needs Node 24.14+ or
    26.
-2. Start everything with `npm start -- --world`, or run GEV's `npm run dev`
-   yourself.
-3. Open **http://localhost:4173/?jarvis=1&welcome=0** in its own window beside
-   JARVIS. The chip at the top reads **JARVIS LINK · ONLINE** and WORLD VIEW
-   lights up in the SYSTEMS rail. In this mode GEV's own mic is off; JARVIS is
-   the voice.
+2. Start everything with `npm start -- --world`. It runs GEV's dev server with
+   `GEV_FRAME_ANCESTORS` set to this page, which is what lets the globe load
+   inside JARVIS. (Running GEV yourself? Put
+   `GEV_FRAME_ANCESTORS=http://localhost:5180,http://127.0.0.1:5180` in its
+   `.env`, with your JARVIS port.)
+3. Click **INITIALISE**. The globe loads inside JARVIS and WORLD VIEW lights up
+   in the SYSTEMS rail. GEV's own mic is off in this mode; JARVIS is the voice.
 4. Ask: *"Take me to Tokyo."* · *"Turn on the flights layer."* · *"How many
    flights are in view?"* · *"What am I looking at?"*
 
-Keep the GEV window visible. A hidden window renders nothing, and JARVIS will
-say it cannot see rather than describe an old frame. Design notes and what
-testing changed: [docs/GODS-EYE-VIEW-PLAN.md](docs/GODS-EYE-VIEW-PLAN.md).
+**Two layouts, switched for you.** JARVIS normally fills the screen with the
+globe in a round scope bottom-right. Any world command brings the globe full
+screen, with JARVIS docked as an orb top-right and the conversation in a card
+bottom-right; after a quiet minute — no world commands, nobody touching the
+globe, JARVIS idle — it slides back. **W**, clicking the orb, or clicking the
+scope switches by hand. Space and Enter still reach JARVIS while the globe has
+focus.
+
+GEV can also run in a separate window at
+`http://localhost:4173/?jarvis=1&welcome=0`; when both are open, the globe
+inside JARVIS keeps the link. Design notes and what testing changed:
+[docs/GODS-EYE-VIEW-PLAN.md](docs/GODS-EYE-VIEW-PLAN.md).
 
 ---
 
@@ -223,6 +233,7 @@ testing changed: [docs/GODS-EYE-VIEW-PLAN.md](docs/GODS-EYE-VIEW-PLAN.md).
 | **"Hey Jarvis"** | Wake him |
 | **Space** | Talk without the wake word |
 | **Enter** | Type instead of speaking (Enter sends, Escape closes) |
+| **W** | Switch between the world view and JARVIS (with God's Eye View running) |
 | Just speak | Interrupt him mid-sentence (barge-in) |
 | **V** | Cycle the browser voice |
 | **Escape** | Stand down |

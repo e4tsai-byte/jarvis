@@ -4,10 +4,12 @@
 steer, question, and literally look at — by connecting it to
 [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (GEV).
 
-**Status:** M0–M4 built and verified. GEV fork `e4tsai-byte/gods-eye-view`,
-branch `jarvis-link`, on upstream `79a0f09`; JARVIS branch `world-view`. One
-gap: `npm start -- --world` was tested only with GEV already serving port 4173
-(it reuses it); the path where it starts GEV itself has not been run.
+**Status:** M0–M4 built and verified, plus a same-tab layout: God's Eye View
+loads inside JARVIS — full screen with JARVIS docked as an orb while the world
+is in use, in a round scope otherwise — switching on its own or with W. GEV
+fork `e4tsai-byte/gods-eye-view`, branch `jarvis-link`, on upstream `79a0f09`;
+JARVIS on `main`. `npm start -- --world` has now run both ways: reusing a
+running GEV, and starting GEV itself.
 
 **What testing changed from the plan:**
 - **Frame size.** GEV caps viewport captures at 200 KB for OpenAI's data
@@ -21,8 +23,21 @@ gap: `npm start -- --world` was tested only with GEV already serving port 4173
 - **First-run panel.** Open GEV at `?jarvis=1&welcome=0`, or its welcome
   panel covers the globe JARVIS is looking at.
 - **Visibility.** A backgrounded GEV tab dropped the link right after a
-  camera flight in the one run done that way. Keep GEV in its own visible
-  window, which is the setup chosen anyway.
+  camera flight in the one run done that way. The same-tab layout removes the
+  problem: the globe is on screen whenever JARVIS is.
+- **Same tab.** GEV refused all framing. `GEV_FRAME_ANCESTORS` now names the
+  exact origins allowed to embed it (anything malformed falls back to refusing
+  all), and `npm start -- --world` sets it to JARVIS's page.
+- **Tool names.** The face only ever saw prettified tool names, so the trigger
+  that brings the globe forward never matched. The bridge client now fires a
+  dedicated signal from the raw name.
+- **Two linked pages, again.** A standalone GEV window left open reconnects
+  after a restart and would take the link from the embedded globe. A page's
+  hello now says whether it is embedded, and an embedded page outranks a
+  standalone one.
+- **GEV's HUD corners.** JARVIS's orb and card own the right-hand corners, so
+  embedded GEV hides its own there — with `display: none`, because the REC dot
+  blinks by setting its own visibility, which shows through a hidden parent.
 
 ---
 
