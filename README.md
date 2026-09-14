@@ -232,14 +232,11 @@ Ask for any of it: *"Put Sky News on."* · *"Show me Nvidia's chart."* ·
 
 With [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (GEV)
 beside it, JARVIS can steer a live 3D globe — real aircraft, ships, satellites,
-earthquakes, fires and public cameras — and look at it. The bridge loads GEV's
-28 tools from your checkout, plus `world_look`, which hands Claude the current
-frame.
+earthquakes, fires and public cameras — and look at it. GEV lives in this repo,
+in `world/`, and the bridge loads its 28 tools from there, plus `world_look`,
+which hands Claude the current frame.
 
-1. Clone the fork with the link on its `jarvis-link` branch
-   (`e4tsai-byte/gods-eye-view`) next to this repo, at `~/Github/gods-eye-view`
-   or wherever `GEV_DIR` points, then `npm ci` in it. GEV needs Node 24.14+ or
-   26.
+1. Install it once: `cd world && npm ci`. GEV needs Node 24.14+ or 26.
 2. Start everything with `npm start -- --world`. It runs GEV's dev server with
    `GEV_FRAME_ANCESTORS` set to this page, which is what lets the globe load
    inside JARVIS. (Running GEV yourself? Put
@@ -263,6 +260,15 @@ GEV can also run in a separate window at
 `http://localhost:4173/?jarvis=1&welcome=0`; when both are open, the globe
 inside JARVIS keeps the link. Design notes and what testing changed:
 [docs/GODS-EYE-VIEW-PLAN.md](docs/GODS-EYE-VIEW-PLAN.md).
+
+**Updating God's Eye View.** `world/` came in with its full history as a git
+subtree, so newer work from its author merges straight in:
+
+```bash
+git subtree pull --prefix=world https://github.com/bilawalsidhu/gods-eye-view.git main
+```
+
+Its MIT licence is in `world/LICENSE`.
 
 ---
 
@@ -308,7 +314,7 @@ Everything is optional in bridge mode. Frontend settings live in `.env.local`
 | `JARVIS_FILE_ROOTS` | — | Roots the `/file` endpoint may serve from |
 | `JARVIS_VOICE_ID` | — | ElevenLabs voice id |
 | `ELEVENLABS_API_KEY` | — | Optional; enables the ElevenLabs voice + Scribe |
-| `GEV_DIR` | `~/Github/gods-eye-view` | God's Eye View checkout for the world view |
+| `GEV_DIR` | `world/` | Where God's Eye View lives, if not in this repo's `world/` |
 | `GEV_ORIGIN` | `localhost:4173` | Page origins allowed to hold the world link |
 | `JARVIS_PERSONAL_REFRESH_MIN` | `30` | Minutes between the dash's calendar and inbox refreshes; `0` turns them off |
 

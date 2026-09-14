@@ -1,9 +1,8 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
 import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 /**
  * JARVIS's view of the world.
@@ -15,15 +14,16 @@ import { pathToFileURL } from 'node:url'
  * call on this server is forwarded to it and answered by the same runner GEV's
  * own agent uses.
  *
- * The schemas are read from the GEV checkout rather than copied, so a tool GEV
- * changes next week changes here too. What JARVIS adds is `world_look`: the
+ * The schemas are read from GEV's own source in world/ rather than copied into
+ * the bridge, so a tool GEV changes next week changes here too. What JARVIS adds is `world_look`: the
  * frame itself, so it can see what it is talking about.
  *
  * The /world socket is an executor, never a user. It can answer requests made
  * from here and nothing else — it has no way to start a turn.
  */
 
-export const GEV_DIR = process.env.GEV_DIR ?? join(homedir(), 'Github', 'gods-eye-view')
+/** God's Eye View lives in this repo, at world/. GEV_DIR points elsewhere. */
+export const GEV_DIR = process.env.GEV_DIR ?? fileURLToPath(new URL('../world', import.meta.url))
 
 /** GEV's dev server. Only these origins may hold the world link. */
 const GEV_ORIGINS = new Set(

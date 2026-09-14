@@ -14,8 +14,8 @@ import { spawn } from 'node:child_process'
 import process from 'node:process'
 import { cpSync, existsSync, mkdirSync } from 'node:fs'
 import net from 'node:net'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /**
  * Put MediaPipe's WebAssembly where the page can actually load it.
@@ -126,11 +126,12 @@ run('face', process.execPath, ['node_modules/vite/bin/vite.js'], '35', {})
  * --world: God's Eye View's dev server alongside, for JARVIS's world view.
  *
  * Optional, so unlike the other two its exit does not take JARVIS down, and it
- * is skipped when GEV is not checked out or something already serves its port.
- * PORT is pinned because GEV's config reads it, and ours may already say 5180.
+ * is skipped when world/ has not been installed (npm ci there) or something
+ * already serves its port. PORT is pinned because GEV's config reads it, and
+ * ours may already say 5180.
  */
 const world = process.argv.includes('--world')
-const GEV_DIR = process.env.GEV_DIR ?? join(homedir(), 'Github', 'gods-eye-view')
+const GEV_DIR = process.env.GEV_DIR ?? fileURLToPath(new URL('../world', import.meta.url))
 const GEV_PORT = 4173
 
 /** `localhost`, not 127.0.0.1: Vite on macOS may listen on IPv6 only. */

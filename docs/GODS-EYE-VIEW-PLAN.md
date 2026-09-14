@@ -7,8 +7,9 @@ steer, question, and literally look at — by connecting it to
 **Status:** M0–M4 built and verified, plus a same-tab layout: God's Eye View
 loads inside JARVIS — full screen with JARVIS docked as an orb while the world
 is in use, in a round scope otherwise — switching on its own or with W. GEV
-fork `e4tsai-byte/gods-eye-view`, branch `jarvis-link`, on upstream `79a0f09`;
-JARVIS on `main`. `npm start -- --world` has now run both ways: reusing a
+now lives in JARVIS's repo as `world/`, a git subtree with its full history; it
+was built on the fork `e4tsai-byte/gods-eye-view`, branch `jarvis-link`, on
+upstream `79a0f09`. `npm start -- --world` has now run both ways: reusing a
 running GEV, and starting GEV itself.
 
 **What testing changed from the plan:**
@@ -195,7 +196,7 @@ to Claude, and JARVIS says *"Fourteen aircraft over Tokyo, sir."* If you then
 ask *"what am I looking at?"*, Claude calls `world_look` and actually sees the
 frame.
 
-### In God's Eye View (a fork: `e4tsai-byte/gods-eye-view`, branch `jarvis-link`)
+### In God's Eye View (now `world/`; built on the fork `e4tsai-byte/gods-eye-view`, branch `jarvis-link`)
 
 1. **`src/jarvis/link.js` (new, ~150 lines):** an opt-in WebSocket client.
    - Off unless the page is opened with `?jarvis=1` or `VITE_JARVIS_BRIDGE_URL`
@@ -224,8 +225,8 @@ These three changes are small enough to offer upstream as a pull request.
 
 4. **`bridge/world.mjs` (new, ~250 lines):** the `jarvis_world` in-process
    MCP server.
-   - **Loads the tool schemas from your GEV checkout** (`GEV_DIR`, default
-     `~/Github/gods-eye-view`) instead of copying them, so when GEV changes a
+   - **Loads the tool schemas from GEV's source** (`GEV_DIR`, default this
+     repo's `world/`) instead of copying them, so when GEV changes a
      tool, JARVIS picks it up automatically. Schemas are converted with
      `z.fromJSONSchema`, which I've verified works for all 28 today. A schema
      that fails to convert is skipped and logged rather than breaking startup.
