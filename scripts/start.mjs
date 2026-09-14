@@ -154,7 +154,15 @@ if (world) {
     const label = paint('world', '33')
     const child = spawn(process.execPath, [vite, '--port', String(GEV_PORT), '--strictPort'], {
       cwd: GEV_DIR,
-      env: { ...process.env, PORT: String(GEV_PORT) },
+      env: {
+        ...process.env,
+        PORT: String(GEV_PORT),
+        // Lets exactly this face embed the globe as its world view. The exact
+        // port, not a wildcard: any other local page stays refused.
+        GEV_FRAME_ANCESTORS:
+          process.env.GEV_FRAME_ANCESTORS ??
+          `http://localhost:${port ?? 5173},http://127.0.0.1:${port ?? 5173}`,
+      },
       shell: false,
     })
     child.stdout.on('data', (d) => process.stdout.write(label(d) + '\n'))
@@ -164,7 +172,7 @@ if (world) {
     })
     children.push(child)
   }
-  console.log(`  world view: open http://localhost:${GEV_PORT}/?jarvis=1&welcome=0 beside JARVIS.\n`)
+  console.log('  world view: loads inside JARVIS — W switches between the globe and JARVIS.\n')
 }
 
 console.log(
