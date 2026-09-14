@@ -334,6 +334,15 @@ async function readOnly(name, input) {
 const text = (v, n) => String(v ?? '').slice(0, n)
 
 /**
+ * A failed read tries again soon rather than leaving the panel blank until the
+ * next half hour. The connectors come up asynchronously in every run, and at a
+ * busy moment — the whole stack starting, say — they can miss the model's
+ * first turn; one unlucky run used to cost thirty minutes of "could not be
+ * read". After these, it waits for the regular interval.
+ */
+const RETRY_MINUTES = [2, 5, 10]
+
+/**
  * Next events and unread mail, refreshed in the background.
  *
  * A panel cannot call the claude.ai connectors itself, so this runs a small
@@ -346,6 +355,8 @@ export function createPersonal() {
   const everyMinutes = Number(process.env.JARVIS_PERSONAL_REFRESH_MIN ?? 30)
   let data = null
   let running = false
+  let failures = 0
+  let retry = null
   const listeners = new Set()
 
   const refresh = async () => {
@@ -361,6 +372,7 @@ export function createPersonal() {
         `It is ${now.toISOString()}; my time zone is ${zone}. Use mcp__claude_ai_Google_Calendar__list_events ` +
         `for my next 3 calendar events from now (in ${zone} if the tool takes a time zone), and ` +
         'mcp__claude_ai_Gmail__search_threads with the query "is:unread in:inbox" for unread mail. ' +
+        'If either tool is not available yet, load it with ToolSearch first: it may still be connecting. ' +
         "Copy every start and every mail time exactly as the tool gives it, with its UTC offset: do not " +
         'convert any time to UTC or to another zone. Reply with ONLY this JSON, no prose: ' +
         '{"events":[{"start":"ISO 8601","title":"","location":""}],' +
@@ -378,14 +390,21 @@ export function createPersonal() {
         },
       })
       let result = ''
+      let ended = ''
       for await (const m of session) {
         if (m.type === 'result') {
           result = String(m.result ?? '')
+          ended = `${m.subtype}, ${m.num_turns} turns`
           break
         }
       }
       const parsed = JSON.parse(result.match(/\{[\s\S]*\}/)?.[0] ?? 'null')
-      if (!parsed) throw new Error('no JSON in the reply')
+      if (!parsed) {
+        // Say how the run ended. A turn limit, a run that never produced a
+        // result and a reply in prose all used to read as the same failure.
+        const said = result ? `: ${result.replace(/\s+/g, ' ').slice(0, 120)}` : ''
+        throw new Error(`no JSON in the reply (${ended || 'no result'})${said}`)
+      }
       const u = parsed.unread ?? {}
       data = {
         at: Date.now(),
@@ -404,10 +423,27 @@ export function createPersonal() {
           })),
         },
       }
+      failures = 0
+      clearTimeout(retry)
       console.log(`[jarvis] calendar and inbox refreshed (${data.events.length} events, ${data.unread.count} unread)`)
     } catch (err) {
-      console.warn(`[jarvis] calendar and inbox refresh failed: ${err?.message ?? err}`)
-      data = { events: [], unread: null, ...(data ?? {}), at: Date.now(), error: 'Calendar and inbox could not be read.' }
+      failures += 1
+      const wait = RETRY_MINUTES[failures - 1]
+      clearTimeout(retry)
+      if (wait) retry = setTimeout(refresh, wait * 60_000)
+      console.warn(
+        `[jarvis] calendar and inbox refresh failed: ${err?.message ?? err}` +
+          (wait ? ` — trying again in ${wait} min` : ''),
+      )
+      data = {
+        events: [],
+        unread: null,
+        ...(data ?? {}),
+        at: Date.now(),
+        error: wait
+          ? `Couldn't read your calendar and inbox — trying again in ${wait} min.`
+          : 'Calendar and inbox could not be read.',
+      }
     } finally {
       running = false
     }
