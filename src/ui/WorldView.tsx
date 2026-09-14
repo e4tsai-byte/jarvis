@@ -58,8 +58,13 @@ export function WorldView() {
 
   // Tell the globe which view it is in: the bare globe in a panel, or GEV's
   // full interface on the whole screen.
+  // The full-screen hub counts as the dash here: the globe is out of sight in
+  // its panel either way, and should be the bare globe when it comes back.
   const tellGlobe = () =>
-    frame.current?.contentWindow?.postMessage({ source: 'jarvis', type: 'layout', layout }, gevOrigin)
+    frame.current?.contentWindow?.postMessage(
+      { source: 'jarvis', type: 'layout', layout: layout === 'world' ? 'world' : 'dash' },
+      gevOrigin,
+    )
   useEffect(tellGlobe, [layout, world, gevOrigin])
 
   // A world tool brings the world forward.
@@ -83,7 +88,7 @@ export function WorldView() {
         return
       }
       if (now - Math.max(lastWorld.current, lastActivity.current, s.layoutAt) > IDLE_RETURN_MS) {
-        s.setLayout('dash')
+        s.setLayout(s.layoutBack)
       }
     }, 3000)
     return () => window.clearInterval(id)
@@ -101,7 +106,7 @@ export function WorldView() {
       // activity — nobody touched anything.
       if (m.type === 'ready') {
         frame.current?.contentWindow?.postMessage(
-          { source: 'jarvis', type: 'layout', layout: useStore.getState().layout },
+          { source: 'jarvis', type: 'layout', layout: useStore.getState().layout === 'world' ? 'world' : 'dash' },
           gevOrigin,
         )
         return
@@ -135,7 +140,7 @@ export function WorldView() {
       const s = useStore.getState()
       if (!s.world || s.phase === 'offline' || s.phase === 'boot') return
       e.preventDefault()
-      s.setLayout(s.layout === 'world' ? 'dash' : 'world')
+      s.setLayout(s.layout === 'world' ? s.layoutBack : 'world')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -153,7 +158,7 @@ export function WorldView() {
         className="world-orb-hit"
         onClick={() => useStore.getState().setLayout('dash')}
         aria-label="Back to the dashboard"
-        tabIndex={layout === 'world' ? 0 : -1}
+        tabIndex={layout === 'dash' ? -1 : 0}
       />
     </>
   )

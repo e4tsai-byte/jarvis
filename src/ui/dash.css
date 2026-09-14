@@ -625,11 +625,86 @@ html:has(.typebar) .dash-convo-list { padding-bottom: 56px; }
   backdrop-filter: blur(6px);
 }
 
+.media-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .media-tabs {
   display: flex;
   gap: 4px;
+}
+
+.media-expand {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.media-expand:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* A tab's own controls: its view and range switches, or its chips. */
+.media-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
+
+.media-seg {
+  display: inline-flex;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.media-seg button {
+  padding: 3px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.media-seg button:hover { opacity: 1; }
+.media-seg button[aria-pressed='true'] {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.media-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: #e8f7fb;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.media-chip:hover { border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.media-chip.on {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.media-chip:disabled { opacity: 0.4; cursor: default; }
+/* A one-off comparison's chips: drawn, just not editable. */
+.media-chip.on:disabled { opacity: 1; }
+.media-chip.is-note { color: var(--accent); }
 
 .media-tabs button,
 .media-row button {
@@ -701,46 +776,284 @@ html:has(.typebar) .dash-convo-list { padding-bottom: 56px; }
   opacity: 0.6;
 }
 
+/* --- markets */
+
 .media-markets {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* A box per stock: two rows fill the hub's box, three the full screen. */
+.mk-gallery {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: calc((100% - 8px) / 2);
+  gap: 8px;
+}
+.is-full .mk-gallery {
+  grid-auto-rows: calc((100% - 20px) / 3);
   gap: 10px;
 }
 
-.media-chart {
+.mk-box {
   position: relative;
   min-width: 0;
   min-height: 0;
+}
+.mk-box-open {
+  width: 100%;
+  height: 100%;
   display: flex;
+  flex-direction: column;
+  padding: 8px 10px 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  color: #e8f7fb;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mk-box-open:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.mk-box-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.mk-box-head b {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+.mk-now {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.mk-box-chart {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  margin-top: 4px;
+}
+.mk-remove {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 50%;
+  background: rgba(2, 10, 14, 0.85);
+  color: #e8f7fb;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+.mk-box:hover .mk-remove,
+.mk-remove:focus-visible { opacity: 1; }
+
+.mk-add {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+button.mk-add span {
+  font-size: 22px;
+  letter-spacing: 0;
+  line-height: 1;
+}
+.mk-add:hover { border-color: color-mix(in srgb, var(--accent) 65%, transparent); }
+.mk-add.is-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
+  cursor: default;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.mk-search {
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: rgba(2, 10, 14, 0.8);
+  color: #e8f7fb;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+.mk-search:focus-visible { border-color: var(--accent); }
+.mk-matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.mk-matches button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: #e8f7fb;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.mk-matches button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.mk-matches b {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 400;
+}
+.mk-matches span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+.mk-matches i {
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.5;
 }
 
-.media-watch {
+.mk-compare,
+.mk-single {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mk-legend {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow: auto;
-}
-.media-watch button {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 6px;
-  padding: 6px 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
-  background: transparent;
-  color: #e8f7fb;
+}
+/* A short stroke of the line's own colour, filled when the line is drawn. */
+.mk-swatch {
+  width: 12px;
+  height: 4px;
+  border: 1px solid;
+  border-radius: 2px;
+}
+.mk-chart {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.mk-change { white-space: nowrap; }
+.mk-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 6px 16px;
+  margin: 0;
+}
+.mk-stats div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.mk-stats dt {
+  font-size: 8px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.mk-stats dd {
+  margin: 0;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  cursor: pointer;
+  color: #e8f7fb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.media-watch button.on {
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+
+/* The gallery's charts: no axes, a lighter line. */
+.price-chart.is-compact .price-line { stroke-width: 1.6; }
+.price-chart.is-compact .price-hover text { font-size: 10px; }
+
+.cmp-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.cmp-leader {
+  fill: none;
+  stroke-width: 1;
+  opacity: 0.8;
+}
+/* End labels wear text ink; the leader carries the line's colour. */
+.cmp-end {
+  fill: #e8f7fb;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+.cmp-tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 3px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: rgba(2, 10, 14, 0.92);
+  color: #e8f7fb;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.cmp-tip b {
+  font-weight: 400;
+  font-size: 10px;
+  opacity: 0.7;
+}
+.cmp-tip span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cmp-tip i {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
 }
 
 /* The arrow carries the direction; the number stays in text ink. */
@@ -832,50 +1145,219 @@ i.down { color: #ff8a8a; font-style: normal; }
   opacity: 0.4;
 }
 
+/* --- headlines, laid out like a video feed */
+
 .media-headlines {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hl-grid {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  gap: 14px 10px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 35%, transparent) transparent;
 }
-.media-headlines ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.hl-grid.is-wide {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 22px 16px;
 }
-.media-headlines li button {
-  display: block;
+
+.hl-card {
+  position: relative;
+  min-width: 0;
+}
+.hl-open {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   width: 100%;
-  padding: 7px 2px;
+  padding: 0;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
   background: none;
   color: #e8f7fb;
   font: inherit;
-  font-size: 12.5px;
-  line-height: 1.35;
-  letter-spacing: 0.01em;
   text-align: left;
   cursor: pointer;
 }
-.media-headlines li button:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
-.media-src {
+/* The channel's tile is always underneath; the picture fades in over it. */
+.hl-thumb {
+  position: relative;
   display: block;
-  margin-bottom: 2px;
-  color: var(--accent);
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  opacity: 0.6;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, #031017), #02080c 70%);
 }
-.media-filter {
-  margin: 0 0 6px;
-  padding: 3px 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+.hl-open:hover .hl-thumb,
+.hl-open:focus-visible .hl-thumb {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.hl-tile {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   color: var(--accent);
-  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  opacity: 0.75;
+}
+.hl-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.hl-thumb img.is-loaded { opacity: 1; }
+/* Where YouTube puts a video's length, the channel. */
+.hl-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+.hl-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+.hl-grid.is-wide .hl-title { font-size: 13.5px; }
+.hl-meta {
   font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  opacity: 0.55;
+}
+.hl-original {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 13px;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.hl-card:hover .hl-original,
+.hl-original:focus-visible { opacity: 1; }
+
+/* --- the live wall, full screen */
+
+/* Three across, two down, each tile the stream's own 16:9 so nothing sits
+   between black bars; the wall centres in whatever height is left. */
+.live-wall {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: center;
+  gap: 10px;
+}
+.wall-tile {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.wall-tile iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+/* The tile you are hearing. */
+.wall-tile.is-audible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+/* Over the player, so a click opens the channel rather than pausing it. */
+.wall-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  background: transparent;
   cursor: pointer;
+}
+.wall-open:hover { background: linear-gradient(transparent 55%, rgba(0, 0, 0, 0.55)); }
+.wall-name {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  z-index: 2;
+  pointer-events: none;
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+.wall-sound {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  z-index: 2;
+  width: 30px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 13px;
+  cursor: pointer;
+}
+.wall-sound[aria-pressed='true'] { border-color: var(--accent); }
+.wall-tile .media-note {
+  margin: auto;
+  color: #e8f7fb;
+}
+
+/* The reader's way out to the page it restyled. */
+.bl-btn.bl-original {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  padding: 0 9px;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------ HUD, on the dash */
@@ -926,6 +1408,12 @@ i.down { color: #ff8a8a; font-style: normal; }
   width: var(--media-w);
   height: var(--media-h);
 }
+/* A slot sizes itself to nothing by default — it only centres a card of
+   fixed size — so here it is stretched over the stack first, or a card sized
+   to fill it would fill nothing. */
+:is([data-layout='dash'], [data-layout='media']) .blades-stack .bl-slot {
+  inset: 0;
+}
 [data-layout='dash'] .blades-stack .bl:not(.bl-expanded) {
   width: 100%;
   height: 100%;
@@ -945,4 +1433,61 @@ i.down { color: #ff8a8a; font-style: normal; }
   transition:
     transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 400ms ease;
+}
+
+/* ------------------------------------------------ the hub, full screen */
+
+/* The hub takes the screen and JARVIS docks top-right, as he does over the
+   globe (index.css), with a rail down the right for his status and the
+   conversation card. The rest of the dash steps back. */
+[data-layout='media'] .dash > :not(.dash-right),
+[data-layout='media'] .dash-right > :not(.dash-media) {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 300ms ease, visibility 0s 300ms;
+}
+[data-layout='media'] .dash-media {
+  position: fixed;
+  inset: 20px 262px 20px 20px;
+  padding: 12px 14px 14px;
+  background: color-mix(in srgb, var(--accent) 4%, rgba(2, 10, 14, 0.94));
+}
+/* The globe waits in its panel out of sight, still linked. */
+[data-layout='media'] .world-frame { visibility: hidden; }
+
+/* JARVIS's panels and articles open over the full-screen hub, at its size. */
+[data-layout='media'] .blades-stack {
+  inset: 20px 262px 20px 20px;
+  width: auto;
+  height: auto;
+}
+[data-layout='media'] .blades-stack .bl:not(.bl-expanded) {
+  width: 100%;
+  height: 100%;
+}
+
+/* The rail: status under the orb, then the conversation card, the caption
+   and typing. Narrower than over the globe, so the status may wrap. */
+[data-layout='media'] .status {
+  max-width: 222px;
+  white-space: normal;
+  text-align: right;
+}
+[data-layout='media'] .log {
+  right: 20px;
+  bottom: 84px;
+  width: 222px;
+  max-height: calc(100vh - 330px);
+  overflow: hidden;
+}
+[data-layout='media'] .log-line { font-size: 12px; }
+[data-layout='media'] :is(.caption, .error) {
+  right: 20px;
+  bottom: 50px;
+  max-width: 222px;
+}
+[data-layout='media'] .typebar {
+  left: calc(100% - 20px - 111px);
+  bottom: 16px;
+  width: 222px;
 }

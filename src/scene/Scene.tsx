@@ -224,6 +224,12 @@ export function Scene() {
       camera={{ position: [0, 0, 6.2], fov: 45 }}
       gl={{ antialias: true, alpha: true }}
       dpr={1}
+      // Measure the canvas's own layout size, not its on-screen box. The orb
+      // is this same canvas scaled down by a CSS transform, and the on-screen
+      // box includes the transform: re-measured while docked, the renderer
+      // shrank itself to the orb's size and then was scaled down again, and
+      // the orb came up empty. Nothing here scrolls, so no scroll listening.
+      resize={{ offsetSize: true, scroll: false }}
     >
       <Rig />
       {/*

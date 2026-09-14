@@ -214,19 +214,33 @@ light pulses along them while JARVIS is thinking, using a tool or speaking.
 - **Conversation** — the whole session under the orb, scrollable, newest at
   the bottom. Typing opens beneath it.
 - **World** — the live globe, with God's Eye View running (below).
-- **Media**, in three tabs:
+- **Media**, in three tabs. **Expand** takes the hub full screen, with JARVIS
+  docked top-right as over the globe; Esc or clicking the orb comes back.
   - *Live* — Al Jazeera English, DW, France 24, Sky News, ABC News (Australia)
     and NBC News, from each channel's own YouTube live stream. Muted until you
-    ask for sound, and silent while you talk or JARVIS speaks.
-  - *Markets* — a watchlist (NVDA, AAPL, SPY, BTC) and an intraday chart.
-    Stocks come from Yahoo Finance, falling back to Nasdaq's public quote API
-    when Yahoo rate-limits; crypto from CoinGecko. Delayed quotes, not for
-    trading.
-  - *Headlines* — the six channels' RSS feeds, merged. Click a story to read
-    it.
+    ask for sound, and silent while you talk or JARVIS speaks. Full screen, all
+    six play at once as a wall: click a tile to watch it alone, 🔊 to hear it.
+  - *Markets* — your watchlist (up to 9 stocks, funds or coins; add with the
+    **+** box by ticker or company name, remove with × on hover) in three
+    views: **Gallery**, a box per stock; **Compare**, their % change on one
+    chart (tap a chip to draw or drop a line); **Single**, one stock big with
+    its day stats. Ranges 1D · 5D · 1M · 1Y apply to all three. The watchlist,
+    range and Compare's picks are saved on this machine in
+    `~/.jarvis/watchlist.json`, so JARVIS can edit them by voice. Stocks come
+    from Yahoo Finance, falling back to Nasdaq's public quote API when Yahoo
+    rate-limits (its 5D is then one price a day, marked "daily closes"); crypto
+    from CoinGecko. Delayed quotes, not for trading.
+  - *Headlines* — the six channels' stories as a thumbnail grid, newest first,
+    with a chip per channel. Pictures come from each feed, or — for Al Jazeera
+    and DW, whose feeds carry none — from the story page's own preview image,
+    fetched once by the bridge and cached. A story opens in JARVIS's reader;
+    **Open original ↗** in its header, or ↗ on a card, opens the real page in a
+    new tab.
 
-Ask for any of it: *"Put Sky News on."* · *"Show me Nvidia's chart."* ·
-*"Any headlines about Ukraine?"* · *"How's Bitcoin doing?"*
+Ask for any of it: *"Put Sky News on."* · *"Put all the news channels up."* ·
+*"Listen to DW."* · *"Show me Nvidia's chart."* · *"Compare Nvidia and AMD over
+the month, full screen."* · *"Add Tesla to my watchlist."* · *"Any headlines
+about Ukraine?"* · *"How's Bitcoin doing?"*
 
 ### JARVIS sees the world
 

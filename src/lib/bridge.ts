@@ -124,6 +124,12 @@ export type MediaCommand = {
   symbol?: string
   filter?: string
   sound?: boolean
+  view?: 'gallery' | 'compare' | 'single'
+  /** A one-off set to show in place of the watchlist. */
+  symbols?: string[]
+  /** true: full screen. false: back to the dash. Absent: leave it. */
+  expand?: boolean
+  liveView?: 'wall' | 'single'
 }
 let onMedia: ((cmd: MediaCommand) => void) | null = null
 export function watchMedia(fn: (cmd: MediaCommand) => void) {
@@ -134,6 +140,13 @@ export function watchMedia(fn: (cmd: MediaCommand) => void) {
 let onPersonal: ((data: unknown) => void) | null = null
 export function watchPersonal(fn: (data: unknown) => void) {
   onPersonal = fn
+}
+
+/** The saved watchlist and range, pushed on connect and after every change —
+ *  from this page, another one, or JARVIS's voice. */
+let onWatchlist: ((data: unknown) => void) | null = null
+export function watchWatchlist(fn: (data: unknown) => void) {
+  onWatchlist = fn
 }
 
 /**
@@ -247,9 +260,22 @@ function dispatch(ws: WebSocket) {
       onWorld?.(typeof msg.linked === 'boolean' ? msg.linked : null)
     } else if (msg.type === 'media') {
       const m = msg as unknown as MediaCommand
-      onMedia?.({ tab: m.tab, channel: m.channel, symbol: m.symbol, filter: m.filter, sound: m.sound })
+      onMedia?.({
+        tab: m.tab,
+        channel: m.channel,
+        symbol: m.symbol,
+        filter: m.filter,
+        sound: m.sound,
+        view: m.view,
+        symbols: Array.isArray(m.symbols) ? m.symbols.map(String) : undefined,
+        expand: typeof m.expand === 'boolean' ? m.expand : undefined,
+        liveView: m.liveView,
+      })
     } else if (msg.type === 'personal') {
       onPersonal?.((msg as unknown as { data?: unknown }).data ?? null)
+    } else if (msg.type === 'watchlist') {
+      const data = (msg as unknown as { data?: unknown }).data
+      if (data) onWatchlist?.(data)
     }
   })
 }

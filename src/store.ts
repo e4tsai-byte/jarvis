@@ -10,6 +10,9 @@ export type Phase =
   | 'tooling'   // an MCP tool is running
   | 'speaking'  // reading the answer back
 
+/** The media hub's chart ranges. */
+export type Range = '1D' | '5D' | '1M' | '1Y'
+
 /**
  * A card on the heads-up display.
  *
@@ -232,8 +235,11 @@ type State = {
    *  has no world view configured, so the light is left out entirely. */
   world: boolean | null
   /** 'dash': everything at once. 'world': the globe full screen, JARVIS docked
-   *  as an orb. */
-  layout: 'dash' | 'world'
+   *  as an orb. 'media': the media hub full screen, JARVIS docked the same way. */
+  layout: 'dash' | 'world' | 'media'
+  /** Where the world view hands back to after its quiet minute: the
+   *  full-screen hub if that is what the globe interrupted, the dash otherwise. */
+  layoutBack: 'dash' | 'media'
   /** When the layout last changed — any switch, by hand or not, restarts the
    *  quiet minute before the world view hands back to the dashboard. */
   layoutAt: number
@@ -250,7 +256,17 @@ type State = {
     filter: string
     /** The user wants sound. It is still muted while they talk or he does. */
     sound: boolean
+    /** Markets: a box per stock, one chart of % change, or one stock big. */
+    view: 'gallery' | 'compare' | 'single'
+    /** Markets: a one-off set JARVIS was asked to show in place of the
+     *  watchlist, until cleared. Never saved. */
+    oneOff: string[]
+    /** Live, full screen: all six channels at once, or one. */
+    liveView: 'wall' | 'single'
   }
+  /** The saved watchlist, the hub's range and which stocks Compare draws —
+   *  the bridge's copy, pushed on connect and after every change. */
+  watchlist: { symbols: string[]; range: Range; compare: string[] }
   /** Next events and unread mail, from the bridge's background refresh. */
   personal: {
     at: number
@@ -275,7 +291,8 @@ type State = {
   setGestures: (on: boolean) => void
   setLooking: (why: string | null) => void
   setWorld: (linked: boolean | null) => void
-  setLayout: (layout: 'dash' | 'world') => void
+  setLayout: (layout: 'dash' | 'world' | 'media') => void
+  setWatchlist: (watchlist: State['watchlist']) => void
   setReactorFrame: (frame: State['reactorFrame']) => void
   setMedia: (patch: Partial<State['media']>) => void
   setPersonal: (personal: State['personal']) => void
@@ -321,8 +338,24 @@ export const useStore = create<State>((set) => ({
   // the expand button calls it up full screen.
   layout: 'dash',
   layoutAt: 0,
+  layoutBack: 'dash',
   reactorFrame: null,
-  media: { tab: 'live', channel: 'sky', symbol: '', filter: '', sound: false },
+  media: {
+    tab: 'live',
+    channel: 'sky',
+    symbol: '',
+    filter: '',
+    sound: false,
+    view: 'gallery',
+    oneOff: [],
+    liveView: 'wall',
+  },
+  // The bridge's defaults, until its own copy arrives over the socket.
+  watchlist: {
+    symbols: ['NVDA', 'AAPL', 'SPY', 'BTC-USD'],
+    range: '1D',
+    compare: ['NVDA', 'AAPL', 'SPY', 'BTC-USD'],
+  },
   personal: null,
   panels: [],
   blades: [],
@@ -335,7 +368,16 @@ export const useStore = create<State>((set) => ({
   setGestures: (gestures) => set({ gestures }),
   setLooking: (looking) => set({ looking }),
   setWorld: (world) => set({ world }),
-  setLayout: (layout) => set({ layout, layoutAt: Date.now() }),
+  // Going into the world view remembers where it came from, so its quiet
+  // minute hands back to the full-screen hub if that is what it interrupted.
+  setLayout: (layout) =>
+    set((s) => ({
+      layout,
+      layoutAt: Date.now(),
+      layoutBack:
+        layout === 'world' && s.layout !== 'world' ? (s.layout === 'media' ? 'media' : 'dash') : s.layoutBack,
+    })),
+  setWatchlist: (watchlist) => set({ watchlist }),
   setReactorFrame: (reactorFrame) => set({ reactorFrame }),
   setMedia: (patch) => set((s) => ({ media: { ...s.media, ...patch } })),
   setPersonal: (personal) => set({ personal }),

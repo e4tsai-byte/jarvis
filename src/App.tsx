@@ -29,6 +29,7 @@ import {
   watchWorld,
   watchMedia,
   watchPersonal,
+  watchWatchlist,
   watchConnection,
   connectedLabels,
   usingBridge,
@@ -465,8 +466,7 @@ export default function App() {
     // The WORLD VIEW light. The bridge pushes the link state on connect and on
     // every change, so a reconnect re-announces it.
     watchWorld((linked) => store.getState().setWorld(linked))
-    // The media hub, switched by JARVIS's voice. Showing something there means
-    // coming back to the dashboard to see it.
+    // The media hub, switched by JARVIS's voice.
     watchMedia((cmd) => {
       const s = store.getState()
       const patch: Partial<typeof s.media> = {}
@@ -475,12 +475,24 @@ export default function App() {
       if (cmd.symbol) patch.symbol = cmd.symbol
       if (cmd.tab === 'headlines') patch.filter = cmd.filter ?? ''
       if (cmd.sound) patch.sound = true
+      if (cmd.view) patch.view = cmd.view
+      if (cmd.liveView) patch.liveView = cmd.liveView
+      // A one-off set stands in for the watchlist until cleared; any other
+      // markets command puts the watchlist back.
+      if (cmd.tab === 'markets') patch.oneOff = cmd.symbols ?? []
       s.setMedia(patch)
-      if (s.layout === 'world') s.setLayout('dash')
+      // Full screen only when asked for. Otherwise the dash, so the answer is
+      // on screen — unless the hub is already full screen, where it stays.
+      if (cmd.expand === true) s.setLayout('media')
+      else if (cmd.expand === false || s.layout === 'world') s.setLayout('dash')
     })
     // The calendar and inbox panel, after each background refresh.
     watchPersonal((data) =>
       store.getState().setPersonal(data as ReturnType<typeof store.getState>['personal']),
+    )
+    // The saved watchlist and range, as the bridge holds them.
+    watchWatchlist((data) =>
+      store.getState().setWatchlist(data as ReturnType<typeof store.getState>['watchlist']),
     )
     watchConnection((state) => {
       if (state === 'lost') {
@@ -687,6 +699,12 @@ export default function App() {
       // no key for at all.
       if (e.key === 'Escape') {
         e.preventDefault()
+        // A full-screen hub goes back to the dash first; standing him down
+        // is the next press.
+        if (store.getState().layout === 'media') {
+          store.getState().setLayout('dash')
+          return
+        }
         if (store.getState().phase !== 'offline') goDormant()
         return
       }

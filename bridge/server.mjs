@@ -24,12 +24,17 @@ import { visionServer } from './vision.mjs'
 import { createWorldLink, loadWorldTools, worldOriginAllowed, worldServer, GEV_DIR } from './world.mjs'
 import {
   CHANNELS,
+  RANGES,
   SYMBOL,
   createPersonal,
+  createWatchlist,
   headlines,
   liveVideo,
   market,
   mediaServer,
+  normalizeSymbol,
+  searchSymbols,
+  stats,
   telemetry,
 } from './dash.mjs'
 import { homedir, tmpdir } from 'node:os'
@@ -718,6 +723,34 @@ const handleRequest = async (req, res) => {
     )
   }
 
+  // The watchlist is the one piece of the dash the page writes, so it asks for
+  // more than the reads below: an Origin we trust must be present, not merely
+  // absent the way an <img> load's is. Small JSON only.
+  if (req.method === 'POST' && req.url === '/dash/watchlist') {
+    if (!origin) {
+      res.writeHead(403, cors)
+      return res.end('forbidden')
+    }
+    let body = ''
+    for await (const chunk of req) {
+      body += chunk
+      if (body.length > 4096) {
+        res.writeHead(413, cors)
+        return res.end('too large')
+      }
+    }
+    let patch
+    try {
+      patch = JSON.parse(body)
+    } catch {
+      res.writeHead(400, cors)
+      return res.end('not json')
+    }
+    const saved = watchlist.update({ symbols: patch?.symbols, range: patch?.range, compare: patch?.compare })
+    res.writeHead(200, { ...cors, 'content-type': 'application/json', 'cache-control': 'no-store' })
+    return res.end(JSON.stringify(saved))
+  }
+
   // The dashboard's data (dash.mjs). JSON only, under the same origin rules as
   // everything else here; every upstream fetch happens server-side.
   if (req.method === 'GET' && req.url?.startsWith('/dash/')) {
@@ -731,10 +764,21 @@ const handleRequest = async (req, res) => {
         case '/dash/telemetry':
           return json(200, await telemetry())
         case '/dash/market': {
-          const symbol = String(url.searchParams.get('symbol') ?? '').toUpperCase()
+          const symbol = normalizeSymbol(url.searchParams.get('symbol'))
+          const range = String(url.searchParams.get('range') ?? '1D').toUpperCase()
           if (!SYMBOL.test(symbol)) return json(400, { error: 'not a market symbol' })
-          return json(200, await market(symbol))
+          if (!RANGES.includes(range)) return json(400, { error: 'not a range' })
+          return json(200, await market(symbol, range))
         }
+        case '/dash/stats': {
+          const symbol = normalizeSymbol(url.searchParams.get('symbol'))
+          if (!SYMBOL.test(symbol)) return json(400, { error: 'not a market symbol' })
+          return json(200, await stats(symbol))
+        }
+        case '/dash/search':
+          return json(200, await searchSymbols(String(url.searchParams.get('q') ?? '').trim().toLowerCase()))
+        case '/dash/watchlist':
+          return json(200, watchlist.get())
         case '/dash/channels':
           return json(200, CHANNELS.map(({ id, name, short }) => ({ id, name, short })))
         case '/dash/live': {
@@ -1057,6 +1101,7 @@ const worldLink = createWorldLink()
 /** The dashboard's calendar and inbox, refreshed in the background (dash.mjs). */
 const personal = createPersonal()
 personal.start()
+const watchlist = createWatchlist()
 
 const wss = new WebSocketServer({
   server,
@@ -1186,6 +1231,11 @@ wss.on('connection', (socket, req) => {
   // The dashboard's calendar and inbox: what is known now, then each refresh.
   if (personal.get()) send({ type: 'personal', data: personal.get() })
   const offPersonal = personal.onChange((data) => send({ type: 'personal', data }))
+
+  // The watchlist and the hub's range: now, then on every change — from this
+  // face, another one, or JARVIS's voice.
+  send({ type: 'watchlist', data: watchlist.get() })
+  const offWatchlist = watchlist.onChange((data) => send({ type: 'watchlist', data }))
 
   /**
    * Which question the agent is currently answering.
@@ -1332,7 +1382,7 @@ wss.on('connection', (socket, req) => {
         // shared by every conversation: there is one globe on the screen.
         ...(WORLD_TOOLS ? { jarvis_world: worldServer(worldLink, WORLD_TOOLS) } : {}),
         // The dashboard's media hub: live news, markets and headlines.
-        jarvis_media: mediaServer((cmd) => send({ type: 'media', ...cmd })),
+        jarvis_media: mediaServer((cmd) => send({ type: 'media', ...cmd }), watchlist),
       },
       // A plain system prompt, not the claude_code preset. The preset is
       // tuned for a coding agent — verbose, file-oriented, and a large chunk
@@ -1577,6 +1627,7 @@ wss.on('connection', (socket, req) => {
     console.log('[jarvis] client disconnected')
     offWorld()
     offPersonal()
+    offWatchlist()
     closed = true
     deliver?.(null)
     session.close?.()

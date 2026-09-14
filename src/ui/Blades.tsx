@@ -528,7 +528,24 @@ function Card({
           <span className="bl-title">{blade.title}</span>
           <span className="bl-kind">{blade.kind}</span>
           <span className="bl-acts">
-            {(size || pos.x || pos.y) && !expanded && (
+            {/* The reader restyles the page; the original is one click away,
+                in a new browser tab. */}
+            {blade.kind === 'article' && blade.url && /^https?:\/\//i.test(blade.url) && (
+              <a
+                className="bl-btn bl-original"
+                href={blade.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                title="Open the original page in a new tab"
+              >
+                Open original ↗
+              </a>
+            )}
+            {/* Boolean(): with no size and pos.x at 0 the bare expression is
+                the number 0, which React renders as a stray "0". */}
+            {Boolean(size || pos.x || pos.y) && !expanded && (
               <button
                 className="bl-btn"
                 onClick={(e) => {

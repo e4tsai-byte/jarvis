@@ -89,6 +89,11 @@ export function watchPersonal(fn: (data: unknown) => void): void {
   if (usingBridge) bridge.watchPersonal(fn)
 }
 
+/** The saved watchlist and the hub's range, from the bridge. */
+export function watchWatchlist(fn: (data: unknown) => void): void {
+  if (usingBridge) bridge.watchWatchlist(fn)
+}
+
 /**
  * The one thing the bridge asks US for.
  *
