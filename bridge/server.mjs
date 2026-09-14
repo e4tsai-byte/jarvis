@@ -43,6 +43,8 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { createMemory, createThread, memoryServer } from './memory.mjs'
 import { alertsServer, createAlerts } from './alerts.mjs'
+import { createVitals } from './vitals.mjs'
+import { createConditions, statusServer } from './conditions.mjs'
 import { routeTurn } from './router.mjs'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
@@ -324,6 +326,9 @@ function decideTool(name) {
     // His own memory file and alert settings in ~/.jarvis. Nothing outside
     // this machine changes, and writing things down is what they are for.
     if (server === 'jarvis_memory' || server === 'jarvis_alerts') return true
+
+    // The dash's weather, threat level and vitals, read back to him. Reads only.
+    if (server === 'jarvis_status') return true
 
     // The dashboard's media hub: it plays, charts and lists public news and
     // market data on the user's own screen, and changes nothing anywhere.
@@ -810,6 +815,14 @@ const handleRequest = async (req, res) => {
             everyMinutes: personal.everyMinutes,
             data: personal.get(),
           })
+        case '/dash/vitals':
+          return json(200, {
+            enabled: vitals.enabled,
+            everyMinutes: vitals.everyMinutes,
+            data: vitals.get(),
+          })
+        case '/dash/conditions':
+          return json(200, { data: conditions.get() })
         default:
           return json(404, { error: 'not found' })
       }
@@ -1124,6 +1137,12 @@ const memory = createMemory()
 const thread = createThread()
 const alerts = createAlerts({ personal, watchlist, market, headlines })
 alerts.start()
+// Your vitals, and the weather and threat level at home — the same home the
+// earthquake alerts use (vitals.mjs, conditions.mjs).
+const vitals = createVitals()
+vitals.start()
+const conditions = createConditions({ home: () => alerts.home() })
+conditions.start()
 
 const wss = new WebSocketServer({
   server,
@@ -1303,6 +1322,12 @@ wss.on('connection', (socket, req) => {
   // The dashboard's calendar and inbox: what is known now, then each refresh.
   if (personal.get()) send({ type: 'personal', data: personal.get() })
   const offPersonal = personal.onChange((data) => send({ type: 'personal', data }))
+
+  // Vitals and the conditions at home: the same, now and after each read.
+  if (vitals.get()) send({ type: 'vitals', data: vitals.get() })
+  const offVitals = vitals.onChange((data) => send({ type: 'vitals', data }))
+  if (conditions.get()) send({ type: 'conditions', data: conditions.get() })
+  const offConditions = conditions.onChange((data) => send({ type: 'conditions', data }))
 
   // The watchlist and the hub's range: now, then on every change — from this
   // face, another one, or JARVIS's voice.
@@ -1499,6 +1524,8 @@ wss.on('connection', (socket, req) => {
         // What he remembers about the user, and what makes him speak first.
         jarvis_memory: memoryServer(memory),
         jarvis_alerts: alertsServer(alerts),
+        // The dash's weather, threat level and vitals, for asking about.
+        jarvis_status: statusServer(conditions, vitals),
       },
       // A plain system prompt, not the claude_code preset. The preset is
       // tuned for a coding agent — verbose, file-oriented, and a large chunk
@@ -1788,6 +1815,8 @@ wss.on('connection', (socket, req) => {
     console.log('[jarvis] client disconnected')
     offWorld()
     offPersonal()
+    offVitals()
+    offConditions()
     offWatchlist()
     offNudge()
     offAlerts()

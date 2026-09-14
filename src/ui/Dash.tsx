@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useStore, accentFor } from '../store'
+import { useStore, accentFor, type Conditions, type Vitals } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
 import { statusText } from './status'
 import { MediaHub } from './MediaHub'
@@ -184,6 +184,8 @@ export function Dash() {
   const connected = useStore((s) => s.connected)
   const personal = useStore((s) => s.personal)
   const alerts = useStore((s) => s.alerts)
+  const vitals = useStore((s) => s.vitals)
+  const conditions = useStore((s) => s.conditions)
   const root = useRef<HTMLDivElement>(null)
   const [stats, setStats] = useState<Telemetry | null>(null)
   const [traffic, setTraffic] = useState<number[]>([])
@@ -331,14 +333,19 @@ export function Dash() {
     }
   }, [layout, offline])
 
-  // Whatever the bridge already knows about the calendar and inbox; later
-  // refreshes arrive over the socket.
+  // Whatever the bridge already knows about the calendar and inbox, your
+  // vitals and the conditions at home; later reads arrive over the socket.
   useEffect(() => {
     if (offline) return
-    fetch(`${BRIDGE_HTTP_URL}/dash/personal`, { signal: AbortSignal.timeout(3000) })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((p) => p?.data && useStore.getState().setPersonal(p.data))
-      .catch(() => {})
+    const s = useStore.getState()
+    const read = <T,>(path: string, use: (data: T) => void) =>
+      fetch(`${BRIDGE_HTTP_URL}${path}`, { signal: AbortSignal.timeout(3000) })
+        .then((r) => (r.ok ? (r.json() as Promise<{ data?: T } | null>) : null))
+        .then((p) => p?.data && use(p.data))
+        .catch(() => {})
+    read('/dash/personal', s.setPersonal)
+    read('/dash/vitals', s.setVitals)
+    read('/dash/conditions', s.setConditions)
   }, [offline])
 
   const memPct = stats ? Math.round((100 * stats.memory.used) / stats.memory.total) : 0
@@ -407,6 +414,10 @@ export function Dash() {
             <h3 className="dash-title">Inbox{personal?.unread ? ` · ${personal.unread.count} unread` : ''}</h3>
             <Inbox personal={personal} />
           </section>
+          <section className="dash-block" data-anchor="vitals" data-drag style={place('vitals')} title={MOVE_HINT}>
+            <h3 className="dash-title">Vitals</h3>
+            <VitalsReadout vitals={vitals} />
+          </section>
         </aside>
 
         <div className="dash-core">
@@ -424,6 +435,14 @@ export function Dash() {
         </div>
 
         <aside className="dash-flank dash-flank-right">
+          <section className="dash-block" data-anchor="threat" data-drag style={place('threat')} title={MOVE_HINT}>
+            <h3 className="dash-title">Threat level</h3>
+            <Threat conditions={conditions} />
+          </section>
+          <section className="dash-block" data-anchor="weather" data-drag style={place('weather')} title={MOVE_HINT}>
+            <h3 className="dash-title">Weather{conditions?.home ? ` · ${conditions.home.name.split(',')[0]}` : ''}</h3>
+            <Weather conditions={conditions} />
+          </section>
           <section className="dash-block" data-anchor="machine" data-drag style={place('machine')} title={MOVE_HINT}>
             <h3 className="dash-title">Machine</h3>
             <dl className="dash-readout">
@@ -522,7 +541,8 @@ function Traces() {
       const o = el.getBoundingClientRect()
       const at = (name: string) => {
         const r = el.querySelector(`[data-anchor="${name}"]`)?.getBoundingClientRect()
-        return r && {
+        // A readout a short window has hidden has no box, and gets no trace.
+        return r && r.width + r.height > 0 && {
           l: Math.round(r.left - o.left),
           r: Math.round(r.right - o.left),
           t: Math.round(r.top - o.top),
@@ -592,7 +612,9 @@ function Traces() {
           flow(ax, above ? a.b + 6 : a.t - 6, [0, above ? -1 : 1])
         }
       }
-      for (const name of ['cpu', 'traffic', 'mem', 'today', 'inbox', 'machine', 'link']) toward(name)
+      for (const name of ['cpu', 'traffic', 'mem', 'today', 'inbox', 'vitals', 'threat', 'weather', 'machine', 'link']) {
+        toward(name)
+      }
 
       const key = next.map((t) => t.d).join('|')
       if (key !== drawn.current) {
@@ -777,6 +799,211 @@ function Inbox({ personal }: { personal: Personal }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+/** °F, mph and miles where the browser's locale is American; °C, km/h and km
+ *  everywhere else. The bridge sends metric. */
+const IMPERIAL = (() => {
+  try {
+    return new Intl.Locale(navigator.language).maximize().region === 'US'
+  } catch {
+    return false
+  }
+})()
+const deg = (c: number | null | undefined) => (c == null ? '—' : `${Math.round(IMPERIAL ? (c * 9) / 5 + 32 : c)}°`)
+const speed = (kmh: number) => (IMPERIAL ? `${Math.round(kmh / 1.609)} mph` : `${Math.round(kmh)} km/h`)
+const distance = (km: number, places = 0) =>
+  IMPERIAL ? `${(km / 1.609).toFixed(places)} mi` : `${km.toFixed(places)} km`
+const hm = (minutes: number) => `${Math.floor(minutes / 60)}h ${String(Math.round(minutes % 60)).padStart(2, '0')}m`
+
+/** "today", "yesterday", "3d ago" — by calendar day, not by hours. */
+function ago(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - d.setHours(0, 0, 0, 0)) / 86_400_000)
+  return days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days}d ago`
+}
+
+/** One activity, for the Last row's tooltip. */
+const activityLine = (a: Vitals['recent'][number]) =>
+  `${when(a.start)}  ${a.name}` +
+  [a.km ? distance(a.km, 1) : null, a.minutes ? `${a.minutes} min` : null, a.effort != null ? `effort ${a.effort}` : null]
+    .filter(Boolean)
+    .map((s) => ` · ${s}`)
+    .join('')
+
+/**
+ * HRV and sleep against their usual, the week's training load, and the latest
+ * two activities. A value a source could not give says why, in words, where
+ * the number would be.
+ */
+function VitalsReadout({ vitals }: { vitals: Vitals | null }) {
+  if (!vitals) return <p className="dash-empty">Reading your vitals…</p>
+  const { hrv, sleep, load, notes, recent } = vitals
+  const last = recent[0]
+  if (vitals.error && !hrv && !sleep && !load && !vitals.recent.length) {
+    return <p className="dash-empty">{vitals.error}</p>
+  }
+  const missing = (note: string | null, source: string) => (
+    <span className="dash-na" title={`From ${source}${note ? ` — ${note}` : ''}`}>
+      {note ?? '—'}
+    </span>
+  )
+  return (
+    <>
+      <dl className="dash-readout">
+        <div>
+          <dt>HRV</dt>
+          <dd title={hrv ? `Overnight RMSSD, ${hrv.date}` : undefined}>
+            {hrv ? (
+              <>
+                {hrv.value} ms{hrv.baseline ? <small> · usual {hrv.baseline}</small> : null}
+              </>
+            ) : (
+              missing(notes.hrv, 'Tredict')
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Sleep</dt>
+          <dd title={sleep ? `Night of ${sleep.date}` : undefined}>
+            {sleep ? (
+              <>
+                {hm(sleep.minutes)}
+                {sleep.baselineMinutes ? <small> · usual {hm(sleep.baselineMinutes)}</small> : null}
+              </>
+            ) : (
+              missing(notes.sleep, 'Tredict')
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Load 7d</dt>
+          <dd
+            title={
+              load
+                ? `Strava relative effort: ${load.week} over ${load.sessions} sessions in 7 days; a usual week is ${load.typical}`
+                : undefined
+            }
+          >
+            {load ? (
+              <>
+                {load.week}
+                {load.ratio != null ? <small> · {load.ratio.toFixed(1)}× usual</small> : null}
+              </>
+            ) : (
+              missing(notes.activities ?? 'no effort data', 'Strava')
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Last</dt>
+          <dd title={recent.map(activityLine).join('\n') || undefined}>
+            {last ? (
+              <>
+                {last.name}
+                <small> · {ago(last.start)}</small>
+              </>
+            ) : (
+              missing(notes.activities, 'Strava')
+            )}
+          </dd>
+        </div>
+      </dl>
+    </>
+  )
+}
+
+const THREAT_CLASS = ['calm', 'guarded', 'elevated', 'alert']
+
+/** Calm to alert, as a word and four segments, with what is behind it. */
+function Threat({ conditions }: { conditions: Conditions | null }) {
+  if (!conditions) return <p className="dash-empty">Assessing…</p>
+  if (!conditions.home) return <p className="dash-empty">Tell me where home is: “My home is Taipei.”</p>
+  const t = conditions.threat
+  if (!t) return <p className="dash-empty">{conditions.error ?? 'Assessing…'}</p>
+  const about =
+    `Earthquakes, fires, storms, weather warnings and air near ${conditions.home.name}.\n` +
+    t.reasons.map((r) => `${r.text}${r.km != null ? ` · ${distance(r.km)}` : ''}\n`).join('') +
+    `Sources: ${t.sources.join(', ')}` +
+    (t.missing.length ? `\nNot read this time: ${t.missing.join(', ')}` : '')
+  return (
+    <div className={`dash-threat is-${THREAT_CLASS[t.level]}`} title={about}>
+      <div className="dash-threat-head">
+        <b>{t.label}</b>
+        <span className="dash-threat-meter" aria-hidden>
+          {THREAT_CLASS.map((c, i) => (
+            <i key={c} className={i <= t.level ? 'on' : undefined} />
+          ))}
+        </span>
+      </div>
+      <ul className="dash-threat-why">
+        {t.reasons.length === 0 ? (
+          <li>Nothing nearby{t.missing.length ? ' (partial read)' : ''}</li>
+        ) : (
+          // Two lines at most; the tooltip lists them all.
+          t.reasons.slice(0, 2).map((r) => (
+            <li key={r.text}>
+              {r.text}
+              {r.km != null && <small> · {distance(r.km)}</small>}
+            </li>
+          ))
+        )}
+      </ul>
+    </div>
+  )
+}
+
+/** Now, today's range, the wind and the air. */
+function Weather({ conditions }: { conditions: Conditions | null }) {
+  const w = conditions?.weather
+  if (!w) {
+    return (
+      <p className="dash-empty">
+        {!conditions ? 'Reading the weather…' : !conditions.home ? 'No home set.' : (conditions.error ?? 'Weather unavailable.')}
+      </p>
+    )
+  }
+  const air = conditions.air
+  return (
+    <>
+      <div className="dash-wx-now">
+        <b>{deg(w.temp)}</b>
+        <span>
+          {w.condition}
+          <small>
+            feels {deg(w.feels)} · {Math.round(w.humidity)}%
+          </small>
+        </span>
+      </div>
+      <dl className="dash-readout">
+        <div>
+          <dt>Hi · Lo</dt>
+          <dd>
+            {deg(w.high)} · {deg(w.low)}
+          </dd>
+        </div>
+        <div>
+          <dt>Wind</dt>
+          <dd title={`Gusts ${speed(w.gusts)}`}>{speed(w.wind)}</dd>
+        </div>
+        <div>
+          <dt>Air</dt>
+          <dd title={air ? `US AQI ${air.aqi}${air.pm25 != null ? `, PM2.5 ${air.pm25} µg/m³` : ''}` : undefined}>
+            {air ? (
+              <>
+                {air.aqi}
+                <small> · {air.category}</small>
+              </>
+            ) : (
+              '—'
+            )}
+          </dd>
+        </div>
+      </dl>
+      <span className="dash-source">Weather data by Open-Meteo.com</span>
+    </>
   )
 }
 

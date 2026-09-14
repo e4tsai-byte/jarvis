@@ -13,6 +13,49 @@ export type Phase =
 /** The media hub's chart ranges. */
 export type Range = '1D' | '5D' | '1M' | '1Y'
 
+/** Your vitals, from the bridge's background read of Tredict and Strava
+ *  (vitals.mjs). A source that could not answer leaves its value null and
+ *  says why in `notes`. */
+export type Vitals = {
+  at: number
+  error: string | null
+  hrv: { value: number; baseline: number | null; date: string } | null
+  sleep: { minutes: number; baselineMinutes: number | null; date: string } | null
+  /** Strava relative effort over the last 7 days, and an average week of the last 4. */
+  load: { week: number; typical: number; ratio: number | null; sessions: number } | null
+  recent: { name: string; sport: string; start: string; km: number | null; minutes: number | null; effort: number | null }[]
+  notes: { hrv: string | null; sleep: string | null; activities: string | null }
+}
+
+/** The weather, the air and the threat level at home (conditions.mjs).
+ *  Celsius, km/h and km; the dash converts for the locale. */
+export type Conditions = {
+  at: number
+  error: string | null
+  home: { name: string } | null
+  weather: {
+    temp: number
+    feels: number
+    humidity: number
+    wind: number
+    gusts: number
+    code: number
+    condition: string
+    isDay: boolean
+    high: number | null
+    low: number | null
+  } | null
+  air: { aqi: number; category: string; pm25: number | null } | null
+  threat: {
+    level: 0 | 1 | 2 | 3
+    label: string
+    reasons: { level: number; text: string; km: number | null }[]
+    sources: string[]
+    /** Feeds that could not be read this time. */
+    missing: string[]
+  } | null
+}
+
 /**
  * A card on the heads-up display.
  *
@@ -279,6 +322,8 @@ type State = {
     events: { start: string; title: string; location: string }[]
     unread: { count: number; latest: { from: string; subject: string; at: string }[] } | null
   } | null
+  vitals: Vitals | null
+  conditions: Conditions | null
   /** Transient status line during boot, e.g. the voice model download. */
   bootNote: string
   /** Cards currently on the display, newest last. */
@@ -303,6 +348,8 @@ type State = {
   setReactorFrame: (frame: State['reactorFrame']) => void
   setMedia: (patch: Partial<State['media']>) => void
   setPersonal: (personal: State['personal']) => void
+  setVitals: (vitals: Vitals | null) => void
+  setConditions: (conditions: Conditions | null) => void
   setBootNote: (n: string) => void
   pushPanel: (p: Panel) => void
   clearPanels: () => void
@@ -365,6 +412,8 @@ export const useStore = create<State>((set) => ({
     compare: ['NVDA', 'AAPL', 'SPY', 'BTC-USD'],
   },
   personal: null,
+  vitals: null,
+  conditions: null,
   panels: [],
   blades: [],
   focusedBlade: null,
@@ -391,6 +440,8 @@ export const useStore = create<State>((set) => ({
   setReactorFrame: (reactorFrame) => set({ reactorFrame }),
   setMedia: (patch) => set((s) => ({ media: { ...s.media, ...patch } })),
   setPersonal: (personal) => set({ personal }),
+  setVitals: (vitals) => set({ vitals }),
+  setConditions: (conditions) => set({ conditions }),
   setBootNote: (bootNote) => set({ bootNote }),
   // Three is as many as fits around the reactor without crowding it. Sticky
   // panels are exempt from the cull — the tool description promises they stay

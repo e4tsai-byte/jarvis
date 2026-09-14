@@ -212,8 +212,26 @@ readouts** puts them all back.
   events and search threads through your Google Calendar and Gmail connectors.
   Each refresh uses a little of your Claude usage;
   `JARVIS_PERSONAL_REFRESH_MIN` changes the interval and `0` turns it off.
-- **Right** — the machine (memory, load, uptime) and the link (down, up,
-  connected systems).
+- **Vitals**, under the inbox — heart-rate variability and last night's
+  sleep, each against your usual two weeks (Tredict); this week's training
+  load against a usual week (Strava's relative effort over 7 days, against
+  the average week of the last 28); and your latest two activities. A
+  background Claude run reads them hourly through your Strava and Tredict
+  connectors, on Haiku and read-only, and the numbers are taken from the
+  tools' own results, never retyped by the model. A value a source cannot
+  give says why in its place — Tredict keeps HRV and sleep for its paid Full
+  Access, for one. `JARVIS_VITALS_REFRESH_MIN` changes the interval and `0`
+  turns it off.
+- **Right** — **Threat level** and **Weather**, then the machine (memory,
+  load, uptime) and the link (down, up, connected systems). Weather is
+  Open-Meteo's: now, today's high and low, wind, and the US air quality
+  index. The threat level runs CALM, GUARDED, ELEVATED, ALERT: the worst of
+  what is near home, with the reasons under it — earthquakes (USGS), fire
+  hotspots (NASA FIRMS, through God's Eye View's FIRMS key when it has one),
+  wildfires and tropical storms (NASA EONET), National Weather Service
+  warnings in the US, thunderstorms, gusts and heat, and bad air. Hover it
+  for the sources. Both are for home, the place set for earthquake alerts
+  (*"My home is Taipei."*), and refresh every ten minutes.
 - **Conversation** — the whole session under the orb, scrollable, newest at
   the bottom. Typing opens beneath it.
 - **World** — the live globe, with God's Eye View running (below).
@@ -243,7 +261,8 @@ readouts** puts them all back.
 Ask for any of it: *"Put Sky News on."* · *"Put all the news channels up."* ·
 *"Listen to DW."* · *"Show me Nvidia's chart."* · *"Compare Nvidia and AMD over
 the month, full screen."* · *"Add Tesla to my watchlist."* · *"Any headlines
-about Ukraine?"* · *"How's Bitcoin doing?"*
+about Ukraine?"* · *"How's Bitcoin doing?"* · *"How's the weather?"* ·
+*"What's the threat level?"* · *"How's my training load this week?"*
 
 ### Memory
 
@@ -379,6 +398,8 @@ Everything is optional in bridge mode. Frontend settings live in `.env.local`
 | `GEV_DIR` | `world/` | Where God's Eye View lives, if not in this repo's `world/` |
 | `GEV_ORIGIN` | `localhost:4173` | Page origins allowed to hold the world link |
 | `JARVIS_PERSONAL_REFRESH_MIN` | `30` | Minutes between the dash's calendar and inbox refreshes; `0` turns them off |
+| `JARVIS_VITALS_REFRESH_MIN` | `60` | Minutes between the dash's vitals reads; `0` turns them off |
+| `FIRMS_MAP_KEY` | `world/.env`'s | NASA FIRMS key for fire hotspots in the threat level; without one, fires come from EONET alone |
 
 **Two models, one conversation.** A short command to the interface (*"put Sky
 on"*, *"show me Nvidia"*, *"mute it"*), small talk, or a quick lookup runs on

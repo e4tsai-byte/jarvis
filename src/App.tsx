@@ -29,6 +29,8 @@ import {
   watchWorld,
   watchMedia,
   watchPersonal,
+  watchVitals,
+  watchConditions,
   watchWatchlist,
   watchNudges,
   watchThread,
@@ -499,6 +501,11 @@ export default function App() {
     // The calendar and inbox panel, after each background refresh.
     watchPersonal((data) =>
       store.getState().setPersonal(data as ReturnType<typeof store.getState>['personal']),
+    )
+    // Vitals, and the weather and threat level at home, after each read.
+    watchVitals((data) => store.getState().setVitals(data as ReturnType<typeof store.getState>['vitals']))
+    watchConditions((data) =>
+      store.getState().setConditions(data as ReturnType<typeof store.getState>['conditions']),
     )
     // The saved watchlist and range, as the bridge holds them.
     watchWatchlist((data) =>

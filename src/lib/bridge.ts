@@ -142,6 +142,17 @@ export function watchPersonal(fn: (data: unknown) => void) {
   onPersonal = fn
 }
 
+/** Vitals and the conditions at home, pushed after each background read
+ *  (vitals.mjs, conditions.mjs). */
+let onVitals: ((data: unknown) => void) | null = null
+export function watchVitals(fn: (data: unknown) => void) {
+  onVitals = fn
+}
+let onConditions: ((data: unknown) => void) | null = null
+export function watchConditions(fn: (data: unknown) => void) {
+  onConditions = fn
+}
+
 /** The saved watchlist and range, pushed on connect and after every change —
  *  from this page, another one, or JARVIS's voice. */
 let onWatchlist: ((data: unknown) => void) | null = null
@@ -309,6 +320,10 @@ function dispatch(ws: WebSocket) {
       })
     } else if (msg.type === 'personal') {
       onPersonal?.((msg as unknown as { data?: unknown }).data ?? null)
+    } else if (msg.type === 'vitals') {
+      onVitals?.((msg as unknown as { data?: unknown }).data ?? null)
+    } else if (msg.type === 'conditions') {
+      onConditions?.((msg as unknown as { data?: unknown }).data ?? null)
     } else if (msg.type === 'watchlist') {
       const data = (msg as unknown as { data?: unknown }).data
       if (data) onWatchlist?.(data)

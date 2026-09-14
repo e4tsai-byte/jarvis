@@ -85,7 +85,7 @@ function spokenName(q) {
   return name || q?.symbol || 'That stock'
 }
 
-function kmBetween(a, b) {
+export function kmBetween(a, b) {
   const rad = (d) => (d * Math.PI) / 180
   const dLat = rad(b.lat - a.lat)
   const dLon = rad(b.lon - a.lon)
@@ -310,6 +310,9 @@ export function createAlerts({ personal, watchlist, market, headlines }) {
     },
     status,
     summary,
+    /** Where home is — { name, lat, lon } — or null. The dash's weather and
+     *  threat level (conditions.mjs) are read for the same place. */
+    home: () => s.home,
     /** Change settings. A briefing time later today re-arms today's briefing. */
     async update(patch) {
       for (const key of ['quietStart', 'quietEnd', 'briefingAt']) {
@@ -398,7 +401,7 @@ export function alertsServer(alerts) {
       tool('alerts_get', 'The current alert settings: quiet hours, briefing time, the stock-move threshold, followed news topics, home location, and which kinds are on.', {}, guard(() => alerts.summary())),
       tool(
         'alerts_set',
-        'Change what makes you speak up and when. Times are HH:MM, 24-hour, local. quietStart equal to quietEnd turns quiet hours off. home is a place name (a city) used for earthquake alerts; "none" clears it. The kinds (calendar, market, news, quake, briefing) switch one kind on or off; enabled switches all of them.',
+        'Change what makes you speak up and when. Times are HH:MM, 24-hour, local. quietStart equal to quietEnd turns quiet hours off. home is a place name (a city) used for earthquake alerts and for the weather and threat level on the dash; "none" clears it. The kinds (calendar, market, news, quake, briefing) switch one kind on or off; enabled switches all of them.',
         {
           enabled: z.boolean().optional().catch(undefined),
           quietStart: z.string().optional().catch(undefined),

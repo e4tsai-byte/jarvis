@@ -266,9 +266,18 @@
 .dash-flank {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 56px;
+  /* Safe, so a flank taller than its row grows downward rather than up into
+     the rings; the padding is the rings' own drop (the 38px below), which a
+     transform does not reserve. */
+  justify-content: safe center;
+  padding-top: 30px;
+  /* Each flank holds three or four groups now; a shorter window closes the
+     gaps before the groups crowd the orb. */
+  gap: clamp(12px, 4.5vh, 56px);
 }
+/* A group never squeezes below its own content: that overlaps its lines with
+   the next group's. A flank that is too tall runs on, downward, instead. */
+.dash-flank > * { flex-shrink: 0; }
 .dash-flank-left { grid-area: left; }
 .dash-flank-right { grid-area: right; }
 
@@ -390,6 +399,131 @@
   letter-spacing: 0.02em;
   text-transform: none;
   opacity: 0.55;
+}
+
+/* --- vitals, threat level and weather */
+
+/* A reading's context — its usual, its category — quieter than the reading. */
+.dash-readout dd small {
+  font-size: 9.5px;
+  opacity: 0.55;
+}
+/* A value a source could not give: why, in words, where the number would be. */
+.dash-readout .dash-na {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  opacity: 0.5;
+}
+/* A short window has room for less: each list keeps its first two lines, and
+   the link readout steps out — its traffic is already the trace in the top
+   row. The traces skip what is hidden. */
+@media (max-height: 780px) {
+  .dash-flank .dash-list > li:nth-child(n + 3) { display: none; }
+  .dash-flank [data-anchor='link'] { display: none; }
+}
+
+/* The level takes a colour of its own; the readouts around it stay cyan. */
+.dash-threat {
+  --level: var(--accent);
+  display: grid;
+  gap: 7px;
+}
+.dash-threat.is-guarded { --level: #e8d06a; }
+.dash-threat.is-elevated { --level: #f0a93c; }
+.dash-threat.is-alert { --level: #ff6b6b; }
+.dash-threat-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dash-threat-head b {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  color: var(--level);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--level) 55%, transparent);
+}
+.dash-threat-meter {
+  flex: 1;
+  max-width: 64px;
+  margin-left: auto;
+  display: flex;
+  gap: 3px;
+}
+.dash-threat-meter i {
+  flex: 1;
+  height: 6px;
+  transform: skewX(-20deg);
+  background: color-mix(in srgb, var(--level) 16%, transparent);
+}
+.dash-threat-meter i.on {
+  background: var(--level);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--level) 70%, transparent);
+}
+.dash-threat-why {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.dash-threat-why li {
+  color: #e8f7fb;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-threat-why small { opacity: 0.55; }
+.dash-threat.is-calm .dash-threat-why li { opacity: 0.6; }
+.dash-threat.is-alert b { animation: threat-alert 1.6s ease-in-out infinite; }
+@keyframes threat-alert {
+  50% { opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-threat.is-alert b { animation: none; }
+}
+
+.dash-wx-now {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.dash-wx-now b {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 1;
+  color: #e8f7fb;
+}
+.dash-wx-now span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: #e8f7fb;
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  white-space: nowrap;
+}
+.dash-wx-now small {
+  font-size: 10px;
+  opacity: 0.55;
+}
+/* Open-Meteo's licence asks for its credit beside the data. */
+.dash-source {
+  display: block;
+  margin-top: 8px;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  white-space: nowrap;
+  opacity: 0.4;
 }
 
 /* --- the orb */
