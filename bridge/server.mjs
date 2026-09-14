@@ -1061,7 +1061,7 @@ console.log(
 console.log(
   WORLD_TOOLS
     ? `[jarvis] world view: ${WORLD_TOOLS.length} God's Eye View tools from ${GEV_DIR}` +
-        ' — open http://localhost:4173/?jarvis=1&welcome=0'
+        ' — embedded in JARVIS when God\'s Eye View is running'
     : `[jarvis] world view unavailable — no God's Eye View checkout at ${GEV_DIR}`,
 )
 

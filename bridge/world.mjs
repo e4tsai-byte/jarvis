@@ -56,8 +56,9 @@ const LOOK_TIMEOUT_MS = 20_000
 const MAX_RESULT_CHARS = 20_000
 
 const NOT_OPEN =
-  'The world view is not open. Tell the user once, in one sentence, to open ' +
-  "God's Eye View at http://localhost:4173/?jarvis=1&welcome=0 beside this window."
+  "The world view is not linked. Tell the user once, in one sentence: God's Eye " +
+  'View may not be running (npm start -- --world starts it), or reloading this ' +
+  'page reconnects it.'
 
 const HIDDEN =
   'The world view window is hidden or minimised, so there is no current frame. ' +
@@ -136,19 +137,11 @@ export function createWorldLink() {
     },
 
     attach(ws) {
-      // The newcomer is recorded before the old page is closed, so the old
-      // one's close — sync or not — can never be mistaken for the live page
-      // leaving, which would flash the HUD light off mid-handover.
-      const previous = socket
-      socket = ws
-      if (previous && previous !== ws) {
-        try {
-          previous.close(4000, 'replaced by a newer world view')
-        } catch {
-          /* already gone */
-        }
-      }
-
+      // A page takes the link at its hello, not its handshake, because only the
+      // hello says whether it is the globe embedded in JARVIS's own tab. That
+      // one outranks a standalone window: otherwise a stray standalone tab,
+      // reconnecting after a restart, pulls the globe out from under the HUD
+      // it lives in.
       ws.on('message', (raw) => {
         let msg
         try {
@@ -157,8 +150,27 @@ export function createWorldLink() {
           return
         }
         if (msg?.type === 'hello') {
-          console.log(`[jarvis] world view linked (${String(msg.app ?? 'unknown').slice(0, 40)})`)
-          if (socket === ws) emit(true)
+          const embedded = msg.embedded === true
+          if (socket && socket !== ws && socket.jarvisEmbedded && !embedded) {
+            ws.close(4000, 'the world view embedded in JARVIS holds the link')
+            return
+          }
+          // The newcomer is recorded before the old page is closed, so the old
+          // one's close — sync or not — can never be mistaken for the live
+          // page leaving, which would flash the HUD light off mid-handover.
+          const previous = socket
+          socket = ws
+          ws.jarvisEmbedded = embedded
+          if (previous && previous !== ws) {
+            try {
+              previous.close(4000, 'replaced by a newer world view')
+            } catch {
+              /* already gone */
+            }
+          }
+          const app = String(msg.app ?? 'unknown').slice(0, 40)
+          console.log(`[jarvis] world view linked (${app}${embedded ? ', embedded' : ''})`)
+          emit(true)
           return
         }
         if ((msg?.type === 'result' || msg?.type === 'look') && typeof msg.id === 'string') {
