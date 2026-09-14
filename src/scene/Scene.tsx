@@ -193,12 +193,15 @@ function Rig() {
 }
 
 export function Scene() {
+  // Docked as the orb, the reactor is a 140px circle over a live globe: full
+  // retina resolution there is GPU spent on pixels nobody sees.
+  const docked = useStore((s) => s.world !== null && s.layout === 'world')
   return (
     <Canvas
       className="scene"
       camera={{ position: [0, 0, 6.2], fov: 45 }}
       gl={{ antialias: true, alpha: true }}
-      dpr={[1, 2]}
+      dpr={docked ? 1 : [1, 2]}
     >
       <Rig />
       {/*

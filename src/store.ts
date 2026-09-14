@@ -231,6 +231,9 @@ type State = {
   /** God's Eye View link state for the WORLD VIEW light. null when the bridge
    *  has no world view configured, so the light is left out entirely. */
   world: boolean | null
+  /** 'world': globe full screen, JARVIS docked as an orb. 'jarvis': JARVIS full
+   *  screen, globe in a scope. Only means anything while `world` is not null. */
+  layout: 'jarvis' | 'world'
   /** Transient status line during boot, e.g. the voice model download. */
   bootNote: string
   /** Cards currently on the display, newest last. */
@@ -248,6 +251,7 @@ type State = {
   setGestures: (on: boolean) => void
   setLooking: (why: string | null) => void
   setWorld: (linked: boolean | null) => void
+  setLayout: (layout: 'jarvis' | 'world') => void
   setBootNote: (n: string) => void
   pushPanel: (p: Panel) => void
   clearPanels: () => void
@@ -286,6 +290,8 @@ export const useStore = create<State>((set) => ({
   gestures: false,
   looking: null,
   world: null,
+  // JARVIS first: the globe waits in its scope until a world tool calls it up.
+  layout: 'jarvis',
   panels: [],
   blades: [],
   focusedBlade: null,
@@ -297,6 +303,7 @@ export const useStore = create<State>((set) => ({
   setGestures: (gestures) => set({ gestures }),
   setLooking: (looking) => set({ looking }),
   setWorld: (world) => set({ world }),
+  setLayout: (layout) => set({ layout }),
   setBootNote: (bootNote) => set({ bootNote }),
   // Three is as many as fits around the reactor without crowding it. Sticky
   // panels are exempt from the cull — the tool description promises they stay

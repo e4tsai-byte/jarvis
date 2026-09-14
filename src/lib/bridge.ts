@@ -108,6 +108,15 @@ export function watchWorld(fn: (linked: boolean | null) => void) {
   onWorld = fn
 }
 
+/** A world tool just ran: the cue for the layout to bring the globe forward.
+ *  Its own signal because the HUD's tool readout only ever sees prettified
+ *  names, and a layout switch keyed off display text breaks on the next
+ *  wording change. */
+let onWorldTool: (() => void) | null = null
+export function watchWorldTool(fn: () => void) {
+  onWorldTool = fn
+}
+
 /**
  * Connection state, for the UI.
  *
@@ -447,6 +456,8 @@ export async function ask(
           case 'tool':
             if (!msg.name) break
             tools.push(msg.name)
+            // Read before prettyToolName flattens it into display text.
+            if (msg.name.startsWith('mcp__jarvis_world__')) onWorldTool?.()
             handlers.onTool(prettyToolName(msg.name))
             break
 

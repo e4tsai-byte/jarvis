@@ -75,6 +75,13 @@ export const BRIDGE_WS_URL = str(import.meta.env.VITE_BRIDGE_URL) ?? 'ws://local
 export const BRIDGE_HTTP_URL = BRIDGE_WS_URL.replace(/^ws/, 'http')
 
 /**
+ * God's Eye View, embedded as JARVIS's world view. Moving it off the default
+ * also means adding the new origin to frame-src in index.html, and adding this
+ * page's origin to GEV_FRAME_ANCESTORS on the GEV side.
+ */
+export const GEV_URL = str(import.meta.env.VITE_GEV_URL) ?? 'http://localhost:4173'
+
+/**
  * Speech output engine.
  *
  * false (default) — the browser's own speechSynthesis. Runs on-device, so

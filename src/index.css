@@ -47,6 +47,181 @@ body::after {
   z-index: 1;
 }
 
+/* --------------------------------------------------------------- world view
+   God's Eye View in JARVIS's own tab (WorldView.tsx). While a world view
+   exists the root carries data-layout: 'world' puts the globe full screen and
+   docks the reactor as an orb top-right; 'jarvis' is the usual screen with the
+   globe in a scope bottom-right. Every move is a transform and a clip on the
+   same two elements — nothing reflows and the globe never reloads — and the
+   pixel geometry arrives as variables from WorldView's place(). */
+
+.world-frame {
+  position: fixed;
+  inset: 0;
+  /* Above the reactor, below the HUD: the scope sits on JARVIS's screen. */
+  z-index: 3;
+  pointer-events: none;
+  background: var(--bg);
+  transform: translate(var(--scope-x, 0px), var(--scope-y, 0px)) scale(var(--scope-scale, 0.25));
+  clip-path: circle(50vh at 50% 50%);
+  transition:
+    transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    clip-path 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.world-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+[data-layout='world'] .world-frame {
+  z-index: 0;
+  pointer-events: auto;
+  transform: none;
+  clip-path: circle(75% at 50% 50%);
+}
+
+[data-layout] .scene {
+  clip-path: circle(75% at 50% 50%);
+  transition:
+    transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    clip-path 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* The reactor contracts into its orb, uncovering the globe underneath. */
+[data-layout='world'] .scene {
+  transform: translate(var(--orb-x), var(--orb-y)) scale(var(--orb-scale));
+  clip-path: circle(30vh at 50% 50%);
+}
+
+[data-layout] .instruments,
+[data-layout] body::after {
+  transition: opacity 400ms ease;
+}
+[data-layout='world'] .instruments { opacity: 0; }
+/* The scanlines stay, lighter: the globe should read as seen through JARVIS,
+   not dimmed by him. */
+[data-layout='world'] body::after { opacity: 0.4; }
+
+/* Chrome that would sit on top of GEV's own panels steps aside. */
+[data-layout='world'] .hud :is(.corner, .brand, .rail, .suggest, .hud-bottom) {
+  visibility: hidden;
+}
+
+/* Status under the orb, flush with its right edge so a long phrase grows
+   leftwards rather than off the screen. */
+[data-layout='world'] .status {
+  position: fixed;
+  top: 172px;
+  right: 22px;
+  justify-content: flex-end;
+  margin-left: 0;
+  white-space: nowrap;
+}
+
+/* The conversation, as a card bottom-right — clear of GEV's POWER UP chip,
+   its location dock and its side panels. */
+[data-layout='world'] .log {
+  left: auto;
+  right: 28px;
+  bottom: 142px;
+  transform: none;
+  width: min(420px, 36vw);
+  padding: 14px 16px;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(6px);
+}
+[data-layout='world'] .log:empty { visibility: hidden; }
+[data-layout='world'] .log-line { font-size: 13px; }
+
+[data-layout='world'] :is(.caption, .error) {
+  left: auto;
+  right: 28px;
+  bottom: 106px;
+  transform: none;
+  max-width: min(420px, 36vw);
+  text-align: right;
+}
+
+/* The centring is framer's inline x: -50%, so the bar is placed by its middle. */
+[data-layout='world'] .typebar {
+  left: calc(100% - 28px - min(420px, 36vw) / 2);
+  bottom: 60px;
+  width: min(420px, 36vw);
+}
+
+.world-scope-ring,
+.world-orb-hit {
+  position: fixed;
+  z-index: 5;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.world-scope-ring:focus-visible,
+.world-orb-hit:focus-visible {
+  outline: 1px solid var(--interface);
+  outline-offset: 4px;
+}
+
+.world-scope-ring {
+  right: 28px;
+  bottom: 28px;
+  width: 240px;
+  height: 240px;
+  border: 1px solid color-mix(in srgb, var(--interface) 55%, transparent);
+  box-shadow:
+    0 0 34px color-mix(in srgb, var(--interface) 22%, transparent),
+    inset 0 0 36px rgba(0, 0, 0, 0.55);
+  transition: opacity 400ms ease, border-color 200ms ease;
+}
+.world-scope-ring:hover { border-color: var(--interface); }
+.world-scope-ring span {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 9px/1 'JetBrains Mono', monospace;
+  letter-spacing: 0.32em;
+  color: var(--interface);
+  opacity: 0.7;
+  white-space: nowrap;
+}
+[data-layout='world'] .world-scope-ring {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.world-orb-hit {
+  top: 22px;
+  right: 22px;
+  width: 140px;
+  height: 140px;
+  border: 1px solid color-mix(in srgb, var(--interface) 45%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+}
+[data-layout='world'] .world-orb-hit {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 400ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-frame,
+  [data-layout] .scene {
+    transition: none;
+  }
+}
+
 /* --------------------------------------------------------------------- HUD */
 
 .hud {

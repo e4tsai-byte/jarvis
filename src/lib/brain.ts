@@ -74,6 +74,11 @@ export function watchWorld(fn: (linked: boolean | null) => void): void {
   if (usingBridge) bridge.watchWorld(fn)
 }
 
+/** Fires when a world tool runs, so the layout can bring the globe forward. */
+export function watchWorldTool(fn: () => void): void {
+  if (usingBridge) bridge.watchWorldTool(fn)
+}
+
 /**
  * The one thing the bridge asks US for.
  *
