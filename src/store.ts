@@ -30,15 +30,13 @@ export type Vitals = {
   notes: { hrv: string | null; stress: string | null; sleep: string | null; activities: string | null }
 }
 
-/** What Spotify last said was playing (spotify.mjs): read when the tile is
- *  clicked or JARVIS is asked, never on a timer. An empty title with no
- *  error means nothing was playing. */
+/** The Spotify app on this Mac, followed live by the bridge while a window is
+ *  open (music.mjs). An empty title with no error means nothing is loaded. */
 export type NowPlaying = {
   at: number
   error: string | null
-  reading: boolean
-  /** Who asked: the tile's click or a question to JARVIS. */
-  source: 'tile' | 'voice' | null
+  /** The app itself: open, or closed. */
+  app: 'running' | 'closed' | null
   playing: boolean
   title: string
   artist: string
@@ -47,6 +45,8 @@ export type NowPlaying = {
   progressMs: number | null
   durationMs: number | null
   url: string | null
+  /** The app's volume, 0–100. */
+  volume: number | null
 }
 
 /** The weather, the air and the threat level at home (conditions.mjs).

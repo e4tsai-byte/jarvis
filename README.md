@@ -235,12 +235,19 @@ JARVIS came with.
   for the sources; with God's Eye View linked, click a reason and the globe
   flies to it. Both are for home, the place set for earthquake alerts
   (*"My home is Taipei."*), and refresh every ten minutes.
-- **Now playing**, under the waveform — the last thing Spotify said was playing:
-  the cover, the track, the artist, and how far through, carried forward on
-  the page's own clock. Spotify's connector asks to be read only when you ask
-  what's playing, so the tile never reads by itself: click ↻, or ask JARVIS
-  *"what's playing?"* and his answer lands on the tile too. A click is one
-  small Haiku run; his answer costs nothing extra.
+- **Now playing**, under the waveform — the Spotify app on this Mac, live: the
+  cover, the track, the artist and how far through, with previous, play or
+  pause, next, and a volume slider. The bridge follows the app every couple of
+  seconds while a JARVIS window is open, through the app's own AppleScript —
+  free, with no model run — and never opens it. It shows the desktop app on
+  this Mac only, not your phone.
+- **Music** — JARVIS puts music on in the same app: *"Play Blinding Lights by
+  The Weeknd."* · *"Put on some jazz."* · *"What's playing?"* · *"Pause the
+  music."* · *"Next song."* · *"Volume to 30."* Search is the one thing the app
+  cannot do, so he finds the track with the Spotify connector's search and
+  plays it here; everything else goes straight to the app. No developer
+  account, and Spotify Free is fine. The first time, macOS asks whether JARVIS
+  may control Spotify (System Settings › Privacy & Security › Automation).
 - **Conversation** — the whole session under the orb, scrollable, newest at
   the bottom. Typing opens beneath it.
 - **World** — the live globe, with God's Eye View running (below).

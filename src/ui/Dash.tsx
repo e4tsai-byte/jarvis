@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useStore, accentFor, type Conditions, type NowPlaying, type Vitals } from '../store'
+import { useStore, accentFor, type Conditions, type Vitals } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
 import { statusText } from './status'
 import { MediaHub } from './MediaHub'
+import { NowPlayingReadout } from './NowPlaying'
 import { DecodeText } from './Hud'
 import './dash.css'
 
@@ -252,7 +253,7 @@ export function Dash() {
     if (e.button !== 0) return
     // A button inside a readout is pressed, not dragged: capturing the pointer
     // here would take its click.
-    if ((e.target as HTMLElement).closest('button, a')) return
+    if ((e.target as HTMLElement).closest('button, a, input')) return
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-drag]')
     const name = el?.dataset.anchor
     if (!el || !name) return
@@ -1146,127 +1147,6 @@ function Weather({ conditions }: { conditions: Conditions | null }) {
         </div>
       </dl>
       <span className="dash-source">Weather data by Open-Meteo.com</span>
-    </>
-  )
-}
-
-const EMPTY_TRACK: NowPlaying = {
-  at: 0,
-  error: null,
-  reading: false,
-  source: null,
-  playing: false,
-  title: '',
-  artist: '',
-  album: '',
-  art: null,
-  progressMs: null,
-  durationMs: null,
-  url: null,
-}
-
-/** Remote pictures come through the bridge, as the media hub's do. */
-const viaBridge = (url: string) => `${BRIDGE_HTTP_URL}/img?url=${encodeURIComponent(url)}`
-const mmss = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor((ms % 60_000) / 1000)).padStart(2, '0')}`
-
-/** Ask Spotify what is playing — the tile's own click, never a timer. */
-function readSpotify() {
-  const s = useStore.getState()
-  s.setNowPlaying({ ...(s.nowPlaying ?? EMPTY_TRACK), reading: true, error: null })
-  fetch(`${BRIDGE_HTTP_URL}/dash/spotify`, { method: 'POST', signal: AbortSignal.timeout(60_000) })
-    .then((r) => (r.ok ? (r.json() as Promise<{ data?: NowPlaying }>) : Promise.reject(new Error(String(r.status)))))
-    .then((p) => p.data && useStore.getState().setNowPlaying(p.data))
-    .catch(() => {
-      const n = useStore.getState().nowPlaying
-      useStore.getState().setNowPlaying({ ...(n ?? EMPTY_TRACK), reading: false, error: 'Spotify could not be read.' })
-    })
-}
-
-/**
- * The last thing Spotify said was playing: the cover, the track, the artist
- * and how far through, carried forward on the page's own clock while it
- * plays. Read only when asked — ↻ here, or "what's playing?" to JARVIS.
- */
-function NowPlayingReadout({ np }: { np: NowPlaying | null }) {
-  const [now, setNow] = useState(() => Date.now())
-  const live = Boolean(np?.playing && np.durationMs && np.progressMs != null)
-  useEffect(() => {
-    if (!live) return
-    const id = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(id)
-  }, [live])
-
-  const refresh = (
-    <button
-      type="button"
-      className="dash-np-read"
-      title="Ask Spotify what's playing"
-      aria-label="Ask Spotify what's playing"
-      disabled={np?.reading}
-      onClick={readSpotify}
-    >
-      ↻
-    </button>
-  )
-
-  if (!np?.at) {
-    return (
-      <div className="dash-np">
-        <p className="dash-empty dash-np-text">{np?.reading ? 'Asking Spotify…' : "Ask what's playing"}</p>
-        {refresh}
-      </div>
-    )
-  }
-  const read = new Date(np.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  if (np.error || !np.title) {
-    return (
-      <div className="dash-np">
-        <p className="dash-empty dash-np-text">{np.error ?? `Nothing playing · ${read}`}</p>
-        {refresh}
-      </div>
-    )
-  }
-
-  // Never backwards: the clock only ticks while a song plays, so a fresh read
-  // can land before the next tick and briefly look older than `now`.
-  const since = live ? Math.max(0, now - np.at) : 0
-  const elapsed = np.progressMs != null ? np.progressMs + since : null
-  const ended = Boolean(live && np.durationMs && elapsed != null && elapsed > np.durationMs + 2000)
-  const shown = elapsed != null && np.durationMs ? Math.min(elapsed, np.durationMs) : elapsed
-  const where = ended
-    ? 'ended · read again'
-    : !np.playing
-      ? 'paused'
-      : shown != null && np.durationMs
-        ? `${mmss(shown)} / ${mmss(np.durationMs)}`
-        : ''
-  return (
-    <>
-      <div
-        className="dash-np"
-        title={`${np.title} — ${np.artist}${np.album ? ` · ${np.album}` : ''}\nRead from Spotify at ${read}${np.source === 'voice' ? ', when you asked JARVIS' : ''}`}
-      >
-        {np.art ? <img className="dash-np-art" src={viaBridge(np.art)} alt="" /> : <span className="dash-np-art" aria-hidden />}
-        <span className="dash-np-text">
-          {np.url ? (
-            <a href={np.url} target="_blank" rel="noreferrer">
-              {np.title}
-            </a>
-          ) : (
-            <b>{np.title}</b>
-          )}
-          <small>
-            {np.artist}
-            {where ? ` · ${where}` : ''}
-          </small>
-        </span>
-        {refresh}
-      </div>
-      {np.durationMs && shown != null ? (
-        <span className="dash-np-bar" aria-hidden>
-          <i style={{ transform: `scaleX(${Math.min(1, shown / np.durationMs)})` }} />
-        </span>
-      ) : null}
     </>
   )
 }

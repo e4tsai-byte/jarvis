@@ -152,7 +152,7 @@ let onConditions: ((data: unknown) => void) | null = null
 export function watchConditions(fn: (data: unknown) => void) {
   onConditions = fn
 }
-/** What Spotify last said was playing, after each read (spotify.mjs). */
+/** The Spotify app on this Mac, after every change the bridge sees (music.mjs). */
 let onSpotify: ((data: unknown) => void) | null = null
 export function watchSpotify(fn: (data: unknown) => void) {
   onSpotify = fn

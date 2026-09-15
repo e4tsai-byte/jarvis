@@ -46,7 +46,7 @@ import { createMemory, createThread, memoryServer } from './memory.mjs'
 import { alertsServer, createAlerts } from './alerts.mjs'
 import { createVitals } from './vitals.mjs'
 import { createConditions, statusServer } from './conditions.mjs'
-import { NOW_PLAYING, createNowPlaying } from './spotify.mjs'
+import { CONTROL_ACTIONS, createNowPlaying, musicServer } from './music.mjs'
 import { routeTurn } from './router.mjs'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
@@ -335,6 +335,10 @@ function decideTool(name) {
     // The dashboard's media hub: it plays, charts and lists public news and
     // market data on the user's own screen, and changes nothing anywhere.
     if (server === 'jarvis_media') return true
+
+    // Music in the Spotify app on this Mac (music.mjs): it plays on the
+    // user's own speakers, as the media hub does, and changes nothing else.
+    if (server === 'jarvis_music') return true
 
     const tool = mcpToolOf(name)
     if (EFFECTFUL_VERB.test(tool) && !VETO_EXEMPT.has(`${server}__${tool}`)) {
@@ -774,16 +778,34 @@ const handleRequest = async (req, res) => {
     return res.end(JSON.stringify(saved))
   }
 
-  // The Now playing tile's own click: read Spotify once, now. The watchlist's
-  // rule — a trusted Origin, present — because it spends a model run.
-  if (req.method === 'POST' && req.url === '/dash/spotify') {
+  // The Now playing tile's buttons: transport and volume for the Spotify app
+  // on this Mac. It changes what is playing, so the watchlist's rule — a
+  // trusted Origin, present — and small JSON only.
+  if (req.method === 'POST' && req.url === '/dash/spotify/control') {
     const json = (status, body) => {
       res.writeHead(status, { ...cors, 'content-type': 'application/json', 'cache-control': 'no-store' })
       return res.end(JSON.stringify(body))
     }
     if (!origin) return json(403, { error: 'forbidden' })
-    req.resume()
-    return json(200, { data: await nowPlaying.read() })
+    let body = ''
+    for await (const chunk of req) {
+      body += chunk
+      if (body.length > 256) return json(413, { error: 'too large' })
+    }
+    let ask
+    try {
+      ask = JSON.parse(body)
+    } catch {
+      return json(400, { error: 'not json' })
+    }
+    const action = CONTROL_ACTIONS.includes(ask?.action) ? ask.action : undefined
+    const volume = Number.isFinite(ask?.volume) ? Math.max(0, Math.min(100, Math.round(ask.volume))) : undefined
+    if (!action && volume === undefined) return json(400, { error: 'no action or volume' })
+    try {
+      return json(200, { data: await nowPlaying.control(action, volume) })
+    } catch (err) {
+      return json(502, { error: err?.said ?? 'Spotify did not respond.' })
+    }
   }
 
   // The readouts' default arrangement, saved from the dash's own button. The
@@ -1228,8 +1250,8 @@ alerts.start()
 const conditions = createConditions({ home: () => alerts.home() })
 alerts.watchConditions(conditions)
 conditions.start()
-// What Spotify last said was playing: read on a click or a question, never
-// on a timer (spotify.mjs).
+// The Spotify app on this Mac: followed live while a window is open, and
+// driven from the tile and by voice (music.mjs).
 const nowPlaying = createNowPlaying()
 
 const wss = new WebSocketServer({
@@ -1416,9 +1438,11 @@ wss.on('connection', (socket, req) => {
   const offVitals = vitals.onChange((data) => send({ type: 'vitals', data }))
   if (conditions.get()) send({ type: 'conditions', data: conditions.get() })
   const offConditions = conditions.onChange((data) => send({ type: 'conditions', data }))
-  // What Spotify last said was playing: now, then after each read.
+  // The Spotify app on this Mac: what it holds now, then every change. This
+  // face being open is what keeps the app followed.
   if (nowPlaying.get()) send({ type: 'spotify', data: nowPlaying.get() })
   const offSpotify = nowPlaying.onChange((data) => send({ type: 'spotify', data }))
+  const unwatchSpotify = nowPlaying.watch()
 
   // The watchlist and the hub's range: now, then on every change — from this
   // face, another one, or JARVIS's voice.
@@ -1529,8 +1553,6 @@ wss.on('connection', (socket, req) => {
    */
   const seenTools = new Set()
   const heldTools = new Map()
-  /** His own "what's playing?" calls: their answers feed the Now playing tile. */
-  const spotifyCalls = new Set()
 
   /**
    * Resolves when the turn in flight has actually finished.
@@ -1566,7 +1588,6 @@ wss.on('connection', (socket, req) => {
   const announceTool = (id, name) => {
     if (!name || (id && seenTools.has(id))) return
     if (id) seenTools.add(id)
-    if (id && name === NOW_PLAYING) spotifyCalls.add(id)
     // The display tool isn't work being done, it's the HUD drawing itself —
     // announcing it would put "jarvis · display" in the tool badge and trigger
     // a "working on it" filler for something already on screen.
@@ -1620,6 +1641,9 @@ wss.on('connection', (socket, req) => {
         jarvis_alerts: alertsServer(alerts),
         // The dash's weather, threat level and vitals, for asking about.
         jarvis_status: statusServer(conditions, vitals),
+        // Music in the Spotify app on this Mac: what's playing, play, pause,
+        // skip and volume. The tile follows whatever these change.
+        jarvis_music: musicServer(nowPlaying),
       },
       // A plain system prompt, not the claude_code preset. The preset is
       // tuned for a coding agent — verbose, file-oriented, and a large chunk
@@ -1739,10 +1763,6 @@ wss.on('connection', (socket, req) => {
             for (const block of blocks) {
               if (block?.type === 'tool_result') {
                 settleTool(block.tool_use_id, block.is_error === true)
-                // He was asked what is playing: the tile shows his answer too.
-                if (spotifyCalls.delete(block.tool_use_id) && block.is_error !== true) {
-                  nowPlaying.take(block.content, 'voice')
-                }
               }
             }
             break
@@ -1791,7 +1811,6 @@ wss.on('connection', (socket, req) => {
             // otherwise grow for as long as the socket is open.
             seenTools.clear()
             heldTools.clear()
-            spotifyCalls.clear()
             break
 
           case 'system':
@@ -1917,6 +1936,7 @@ wss.on('connection', (socket, req) => {
     offVitals()
     offConditions()
     offSpotify()
+    unwatchSpotify()
     offWatchlist()
     offNudge()
     offAlerts()
