@@ -345,7 +345,7 @@ export function statusServer(conditions, vitals) {
       ),
       tool(
         'vitals_now',
-        "The user's vitals from the dash: heart-rate variability and sleep against their two-week baselines (Tredict), this week's training load — Strava relative effort — against their usual week, and their latest activities. notes says why anything is missing.",
+        "The user's vitals from the dash: last night's heart-rate variability, the day's stress (0–100) and last night's sleep, each against their usual week (Garmin); this week's training load — Strava relative effort — against their usual week; and their latest activities. notes says why anything is missing.",
         {},
         async () => ok(JSON.stringify(vitals.get() ?? { error: 'Not read yet; the first read runs shortly after start.' })),
       ),

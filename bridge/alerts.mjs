@@ -303,8 +303,11 @@ export function createAlerts({ personal, watchlist, market, headlines, vitals = 
     const hm = (m) => `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`
     const body = [
       v?.load && `training load ${v.load.week} over 7 days against a usual week of ${v.load.typical}`,
-      v?.hrv && `HRV ${v.hrv.value} ms${v.hrv.baseline ? ` against a usual ${v.hrv.baseline}` : ''}`,
-      v?.sleep && `slept ${hm(v.sleep.minutes)}${v.sleep.baselineMinutes ? ` against a usual ${hm(v.sleep.baselineMinutes)}` : ''}`,
+      v?.hrv &&
+        `HRV ${v.hrv.value} ms${v.hrv.baseline ? ` against a usual ${v.hrv.baseline}` : ''}${v.hrv.status ? `, which Garmin calls ${v.hrv.status}` : ''}`,
+      v?.stress && `stress ${v.stress.average} of 100${v.stress.baseline ? ` against a usual ${v.stress.baseline}` : ''}`,
+      v?.sleep &&
+        `slept ${hm(v.sleep.minutes)}${v.sleep.baselineMinutes ? ` against a usual ${hm(v.sleep.baselineMinutes)}` : ''}${v.sleep.score ? `, sleep score ${v.sleep.score}` : ''}`,
       v?.recent?.[0] && `last activity ${v.recent[0].name} on ${v.recent[0].start.slice(0, 10)}`,
     ].filter(Boolean)
     const day = new Date().toDateString()

@@ -212,16 +212,15 @@ readouts** puts them all back.
   events and search threads through your Google Calendar and Gmail connectors.
   Each refresh uses a little of your Claude usage;
   `JARVIS_PERSONAL_REFRESH_MIN` changes the interval and `0` turns it off.
-- **Vitals**, under the inbox — heart-rate variability and last night's
-  sleep, each against your usual two weeks (Tredict); this week's training
-  load against a usual week (Strava's relative effort over 7 days, against
-  the average week of the last 28); and your latest two activities. A
-  background Claude run reads them hourly through your Strava and Tredict
-  connectors, on Haiku and read-only, and the numbers are taken from the
-  tools' own results, never retyped by the model. A value a source cannot
-  give says why in its place — Tredict keeps HRV and sleep for its paid Full
-  Access, for one. `JARVIS_VITALS_REFRESH_MIN` changes the interval and `0`
-  turns it off.
+- **Vitals**, under the inbox — last night's heart-rate variability, the
+  day's stress and last night's sleep, each against your usual week (Garmin);
+  this week's training load against a usual week (Strava's relative effort
+  over 7 days, against the average week of the last 28); and your latest
+  activity. A background Claude run reads them hourly through your Garmin and
+  Strava connectors, on Haiku and read-only, and the numbers are taken from
+  the tools' own results, never retyped by the model. A value a source cannot
+  give says why in its place — "no data yet" until Garmin has synced one.
+  `JARVIS_VITALS_REFRESH_MIN` changes the interval and `0` turns it off.
 - **Right** — **Threat level** and **Weather**, then the machine (memory,
   load, uptime) and the link (down, up, connected systems). Weather is
   Open-Meteo's: now, today's high and low, wind, and the US air quality

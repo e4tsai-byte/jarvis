@@ -843,9 +843,9 @@ const activityLine = (a: Vitals['recent'][number]) =>
  */
 function VitalsReadout({ vitals }: { vitals: Vitals | null }) {
   if (!vitals) return <p className="dash-empty">Reading your vitals…</p>
-  const { hrv, sleep, load, notes, recent } = vitals
+  const { hrv, stress, sleep, load, notes, recent } = vitals
   const last = recent[0]
-  if (vitals.error && !hrv && !sleep && !load && !vitals.recent.length) {
+  if (vitals.error && !hrv && !stress && !sleep && !load && !vitals.recent.length) {
     return <p className="dash-empty">{vitals.error}</p>
   }
   const missing = (note: string | null, source: string) => (
@@ -858,26 +858,43 @@ function VitalsReadout({ vitals }: { vitals: Vitals | null }) {
       <dl className="dash-readout">
         <div>
           <dt>HRV</dt>
-          <dd title={hrv ? `Overnight RMSSD, ${hrv.date}` : undefined}>
+          <dd title={hrv ? `Overnight HRV, night of ${hrv.date}${hrv.status ? ` — ${hrv.status}` : ''}` : undefined}>
             {hrv ? (
               <>
                 {hrv.value} ms{hrv.baseline ? <small> · usual {hrv.baseline}</small> : null}
               </>
             ) : (
-              missing(notes.hrv, 'Tredict')
+              missing(notes.hrv, 'Garmin')
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Stress</dt>
+          <dd
+            title={
+              stress ? `Garmin stress, 0–100, on ${stress.date}${stress.max ? `; peak ${stress.max}` : ''}` : undefined
+            }
+          >
+            {stress ? (
+              <>
+                {stress.average}
+                {stress.baseline ? <small> · usual {stress.baseline}</small> : null}
+              </>
+            ) : (
+              missing(notes.stress, 'Garmin')
             )}
           </dd>
         </div>
         <div>
           <dt>Sleep</dt>
-          <dd title={sleep ? `Night of ${sleep.date}` : undefined}>
+          <dd title={sleep ? `Night of ${sleep.date}${sleep.score ? `; sleep score ${sleep.score}` : ''}` : undefined}>
             {sleep ? (
               <>
                 {hm(sleep.minutes)}
                 {sleep.baselineMinutes ? <small> · usual {hm(sleep.baselineMinutes)}</small> : null}
               </>
             ) : (
-              missing(notes.sleep, 'Tredict')
+              missing(notes.sleep, 'Garmin')
             )}
           </dd>
         </div>
@@ -900,7 +917,7 @@ function VitalsReadout({ vitals }: { vitals: Vitals | null }) {
             )}
           </dd>
         </div>
-        <div>
+        <div className="dash-vitals-last">
           <dt>Last</dt>
           <dd title={recent.map(activityLine).join('\n') || undefined}>
             {last ? (

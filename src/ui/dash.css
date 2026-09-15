@@ -421,6 +421,8 @@
 @media (max-height: 780px) {
   .dash-flank .dash-list > li:nth-child(n + 3) { display: none; }
   .dash-flank [data-anchor='link'] { display: none; }
+  /* Vitals' fifth row: the last activity is also in the Load row's tooltip. */
+  .dash-flank .dash-vitals-last { display: none; }
 }
 
 /* The level takes a colour of its own; the readouts around it stay cyan. */

@@ -13,18 +13,21 @@ export type Phase =
 /** The media hub's chart ranges. */
 export type Range = '1D' | '5D' | '1M' | '1Y'
 
-/** Your vitals, from the bridge's background read of Tredict and Strava
+/** Your vitals, from the bridge's background read of Garmin and Strava
  *  (vitals.mjs). A source that could not answer leaves its value null and
- *  says why in `notes`. */
+ *  says why in `notes`. Baselines are the usual of the week before. */
 export type Vitals = {
   at: number
   error: string | null
-  hrv: { value: number; baseline: number | null; date: string } | null
-  sleep: { minutes: number; baselineMinutes: number | null; date: string } | null
+  /** Last night's HRV in ms; status is Garmin's own word for it ("balanced"). */
+  hrv: { value: number; baseline: number | null; status: string | null; date: string } | null
+  /** Garmin's stress, 0–100: the latest day's average and its peak. */
+  stress: { average: number; baseline: number | null; max: number | null; date: string } | null
+  sleep: { minutes: number; baselineMinutes: number | null; score: number | null; date: string } | null
   /** Strava relative effort over the last 7 days, and an average week of the last 4. */
   load: { week: number; typical: number; ratio: number | null; sessions: number } | null
   recent: { name: string; sport: string; start: string; km: number | null; minutes: number | null; effort: number | null }[]
-  notes: { hrv: string | null; sleep: string | null; activities: string | null }
+  notes: { hrv: string | null; stress: string | null; sleep: string | null; activities: string | null }
 }
 
 /** The weather, the air and the threat level at home (conditions.mjs).
