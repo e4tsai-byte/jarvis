@@ -134,16 +134,31 @@ export function changed(prev, next) {
   return Math.abs(next.progressMs - expected) > DRIFT_MS
 }
 
-/** Play a URI, opening the app first if it is closed. */
+/**
+ * Play a URI, opening the app first if it is closed — and leave the user where
+ * they were. Spotify brings its own window forward when told to play a
+ * particular track (and when it opens), so the app in front beforehand is
+ * noted, and if Spotify takes the front within a moment and a half, that app
+ * is handed it back. A brief flash of Spotify is all that shows. Nothing is
+ * handed back when Spotify was already in front, or never came forward.
+ */
 async function play(uri) {
   await osa(
     [
       'on run argv',
+      'set frontApp to path to frontmost application as text',
       'if application "Spotify" is not running then',
       'tell application "Spotify" to launch',
       'delay 3',
       'end if',
       'tell application "Spotify" to play track (item 1 of argv)',
+      'if frontApp does not end with "Spotify.app:" then',
+      'repeat 15 times',
+      'if (path to frontmost application as text) ends with "Spotify.app:" then exit repeat',
+      'delay 0.1',
+      'end repeat',
+      'if (path to frontmost application as text) ends with "Spotify.app:" then tell application frontApp to activate',
+      'end if',
       'end run',
     ],
     [uri],

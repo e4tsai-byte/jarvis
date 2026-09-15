@@ -245,8 +245,10 @@ JARVIS came with.
   The Weeknd."* · *"Put on some jazz."* · *"What's playing?"* · *"Pause the
   music."* · *"Next song."* · *"Volume to 30."* Search is the one thing the app
   cannot do, so he finds the track with the Spotify connector's search and
-  plays it here; everything else goes straight to the app. No developer
-  account, and Spotify Free is fine. The first time, macOS asks whether JARVIS
+  plays it here; everything else goes straight to the app. Spotify brings its
+  window forward when it starts a song, so JARVIS hands the screen back to
+  whatever you were in — at most a brief flash. No developer account, and
+  Spotify Free is fine. The first time, macOS asks whether JARVIS
   may control Spotify (System Settings › Privacy & Security › Automation).
 - **Conversation** — the whole session under the orb, scrollable, newest at
   the bottom. Typing opens beneath it.
