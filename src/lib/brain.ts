@@ -97,6 +97,10 @@ export function watchVitals(fn: (data: unknown) => void): void {
 export function watchConditions(fn: (data: unknown) => void): void {
   if (usingBridge) bridge.watchConditions(fn)
 }
+/** What Spotify last said was playing, from the bridge. */
+export function watchSpotify(fn: (data: unknown) => void): void {
+  if (usingBridge) bridge.watchSpotify(fn)
+}
 
 /** The saved watchlist and the hub's range, from the bridge. */
 export function watchWatchlist(fn: (data: unknown) => void): void {

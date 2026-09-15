@@ -423,6 +423,8 @@
   .dash-flank [data-anchor='link'] { display: none; }
   /* Vitals' fifth row: the last activity is also in the Load row's tooltip. */
   .dash-flank .dash-vitals-last { display: none; }
+  /* Now playing keeps its track and gives the orb its title line back. */
+  .dash-np-block .dash-title { display: none; }
 }
 
 /* The level takes a colour of its own; the readouts around it stay cyan. */
@@ -535,6 +537,86 @@
   font-size: 10px;
   opacity: 0.55;
 }
+/* --- now playing */
+
+/* Under the waveform, a little wider than it. */
+.dash-np-block { margin: 12px -12% 0; }
+
+.dash-np {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.dash-np-art {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 3px;
+  object-fit: cover;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.dash-np-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+.dash-np-text :is(b, a) {
+  font-weight: 500;
+  font-size: 12px;
+  color: #e8f7fb;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-np-text a:hover { color: var(--accent); }
+.dash-np-text small {
+  font-size: 10px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-np-read {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.dash-np-read:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.dash-np-read:disabled { opacity: 0.5; cursor: default; }
+.dash-np-bar {
+  display: block;
+  height: 2px;
+  margin-top: 7px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.dash-np-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform 1s linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-np-bar i { transition: none; }
+}
+
 /* Open-Meteo's licence asks for its credit beside the data. */
 .dash-source {
   display: block;

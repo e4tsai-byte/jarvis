@@ -31,6 +31,7 @@ import {
   watchPersonal,
   watchVitals,
   watchConditions,
+  watchSpotify,
   watchWatchlist,
   watchNudges,
   watchThread,
@@ -506,6 +507,10 @@ export default function App() {
     watchVitals((data) => store.getState().setVitals(data as ReturnType<typeof store.getState>['vitals']))
     watchConditions((data) =>
       store.getState().setConditions(data as ReturnType<typeof store.getState>['conditions']),
+    )
+    // What Spotify last said was playing, whoever asked.
+    watchSpotify((data) =>
+      store.getState().setNowPlaying(data as ReturnType<typeof store.getState>['nowPlaying']),
     )
     // The saved watchlist and range, as the bridge holds them.
     watchWatchlist((data) =>

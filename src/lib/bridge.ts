@@ -152,6 +152,11 @@ let onConditions: ((data: unknown) => void) | null = null
 export function watchConditions(fn: (data: unknown) => void) {
   onConditions = fn
 }
+/** What Spotify last said was playing, after each read (spotify.mjs). */
+let onSpotify: ((data: unknown) => void) | null = null
+export function watchSpotify(fn: (data: unknown) => void) {
+  onSpotify = fn
+}
 
 /** The saved watchlist and range, pushed on connect and after every change —
  *  from this page, another one, or JARVIS's voice. */
@@ -324,6 +329,8 @@ function dispatch(ws: WebSocket) {
       onVitals?.((msg as unknown as { data?: unknown }).data ?? null)
     } else if (msg.type === 'conditions') {
       onConditions?.((msg as unknown as { data?: unknown }).data ?? null)
+    } else if (msg.type === 'spotify') {
+      onSpotify?.((msg as unknown as { data?: unknown }).data ?? null)
     } else if (msg.type === 'watchlist') {
       const data = (msg as unknown as { data?: unknown }).data
       if (data) onWatchlist?.(data)

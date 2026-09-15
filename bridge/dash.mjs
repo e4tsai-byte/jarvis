@@ -471,6 +471,48 @@ export function createWatchlist() {
   }
 }
 
+// --- the readouts' default arrangement
+
+const LAYOUT_FILE = join(JARVIS_DIR, 'layout.json')
+const READOUT = /^[a-z][a-z0-9-]{0,23}$/
+
+/** Only readout names, and pixel offsets a screen could hold. */
+function cleanReadouts(v) {
+  const out = {}
+  for (const [name, at] of Object.entries(v && typeof v === 'object' ? v : {}).slice(0, 32)) {
+    if (!READOUT.test(name) || !Array.isArray(at) || at.length !== 2) continue
+    const [x, y] = at.map(Number)
+    if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 8000 || Math.abs(y) > 8000) continue
+    out[name] = [Math.round(x), Math.round(y)]
+  }
+  return out
+}
+
+/**
+ * Where the dash's readouts sit by default: each one's offset from its place
+ * in the built-in layout, as the dash's own drag leaves it. What Reset returns
+ * to. Saved on this machine rather than in a browser, so a cleared cache or a
+ * second browser starts from it too.
+ */
+export function createLayout() {
+  let data = { readouts: {} }
+  try {
+    data = { readouts: cleanReadouts(JSON.parse(readFileSync(LAYOUT_FILE, 'utf8')).readouts) }
+  } catch {
+    /* none saved yet: the built-in layout */
+  }
+  return {
+    get: () => data,
+    /** Replace the default. Throws if it cannot be written. */
+    save(readouts) {
+      data = { readouts: cleanReadouts(readouts) }
+      mkdirSync(JARVIS_DIR, { recursive: true })
+      writeFileSync(LAYOUT_FILE, JSON.stringify(data, null, 2))
+      return data
+    },
+  }
+}
+
 // ---------------------------------------------------------------------------
 // News
 // ---------------------------------------------------------------------------

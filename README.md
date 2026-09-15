@@ -201,8 +201,11 @@ The orb floats at its centre, with its name and status above it and your
 voice as a waveform below. Traces flow out of the orb to every readout, and
 light pulses along them while JARVIS is thinking, using a tool or speaking.
 Drag any readout wherever you like and its trace follows; the layout is
-remembered in this browser. Double-click a readout to put it back, or **Reset
-readouts** puts them all back.
+remembered in this browser. **Save as default** keeps it on this machine
+(`~/.jarvis/layout.json`), so a cleared cache or another browser starts from it
+too. Double-click a readout to put it back where the default has it, or
+**Reset readouts** puts them all back; **Original layout** returns to the one
+JARVIS came with.
 
 - **Top row** — CPU and memory rings and a minute of network traffic, read by
   the bridge every two seconds while the dash is showing.
@@ -232,6 +235,12 @@ readouts** puts them all back.
   for the sources; with God's Eye View linked, click a reason and the globe
   flies to it. Both are for home, the place set for earthquake alerts
   (*"My home is Taipei."*), and refresh every ten minutes.
+- **Now playing**, under the waveform — the last thing Spotify said was playing:
+  the cover, the track, the artist, and how far through, carried forward on
+  the page's own clock. Spotify's connector asks to be read only when you ask
+  what's playing, so the tile never reads by itself: click ↻, or ask JARVIS
+  *"what's playing?"* and his answer lands on the tile too. A click is one
+  small Haiku run; his answer costs nothing extra.
 - **Conversation** — the whole session under the orb, scrollable, newest at
   the bottom. Typing opens beneath it.
 - **World** — the live globe, with God's Eye View running (below).

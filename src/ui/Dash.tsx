@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useStore, accentFor, type Conditions, type Vitals } from '../store'
+import { useStore, accentFor, type Conditions, type NowPlaying, type Vitals } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
 import { statusText } from './status'
 import { MediaHub } from './MediaHub'
@@ -75,6 +75,22 @@ function saveOffsets(offsets: Offsets) {
     /* not remembered this time; the layout still moved */
   }
 }
+/** Whether this browser has an arrangement of its own yet. One that has none
+ *  starts from the default saved on the bridge. */
+function hasOwnOffsets() {
+  try {
+    return localStorage.getItem(OFFSETS_KEY) !== null
+  } catch {
+    return false
+  }
+}
+
+/** Two arrangements the same, readout for readout. */
+function sameOffsets(a: Offsets, b: Offsets) {
+  const names = Object.keys(a)
+  return names.length === Object.keys(b).length && names.every((n) => b[n] && a[n][0] === b[n][0] && a[n][1] === b[n][1])
+}
+
 /** Tells the traces to re-route: a transform moves a readout without
  *  resizing anything, so no observer would notice. */
 const relayout = (): void => {
@@ -186,6 +202,7 @@ export function Dash() {
   const alerts = useStore((s) => s.alerts)
   const vitals = useStore((s) => s.vitals)
   const conditions = useStore((s) => s.conditions)
+  const nowPlaying = useStore((s) => s.nowPlaying)
   const root = useRef<HTMLDivElement>(null)
   const [stats, setStats] = useState<Telemetry | null>(null)
   const [traffic, setTraffic] = useState<number[]>([])
@@ -198,6 +215,11 @@ export function Dash() {
   // Readouts the user has moved. While a drag is live the element is moved
   // directly, frame by frame; the state only takes the final position.
   const [offsets, setOffsets] = useState<Offsets>(loadOffsets)
+  // The arrangement Reset and a double-click return to: the built-in layout
+  // until one is saved, then yours — kept on the bridge (~/.jarvis/layout.json),
+  // so it outlives this browser's storage and reaches any other.
+  const [defaults, setDefaults] = useState<Offsets>({})
+  const ownLayout = useRef(hasOwnOffsets())
   const drag = useRef<{ el: HTMLElement; name: string; x0: number; y0: number; ox: number; oy: number; base: DOMRect } | null>(
     null,
   )
@@ -205,12 +227,26 @@ export function Dash() {
     const o = offsets[name]
     return o ? { translate: `${o[0]}px ${o[1]}px` } : undefined
   }
-  const commit = (update: (prev: Offsets) => Offsets) =>
+  const commit = (update: (prev: Offsets) => Offsets) => {
+    ownLayout.current = true
     setOffsets((prev) => {
       const next = update(prev)
       saveOffsets(next)
       return next
     })
+  }
+  const saveDefault = () => {
+    const snapshot = offsets
+    fetch(`${BRIDGE_HTTP_URL}/dash/layout`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ readouts: snapshot }),
+      signal: AbortSignal.timeout(3000),
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<{ readouts?: Offsets }>) : Promise.reject(new Error(String(r.status)))))
+      .then((saved) => setDefaults(saved.readouts ?? snapshot))
+      .catch(() => useStore.getState().setError('The layout could not be saved — is the bridge running?'))
+  }
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return
@@ -251,9 +287,11 @@ export function Dash() {
       const now = performance.now()
       if (lastTap.current?.name === d.name && now - lastTap.current.at < 400) {
         lastTap.current = null
+        // Back to where the default has it.
         commit((prev) => {
           const next = { ...prev }
-          delete next[d.name]
+          if (defaults[d.name]) next[d.name] = defaults[d.name]
+          else delete next[d.name]
           return next
         })
       } else {
@@ -267,6 +305,21 @@ export function Dash() {
 
   // Once React has placed them, the traces follow.
   useEffect(relayout, [offsets])
+
+  // The saved default, once the bridge answers; read again after boot in
+  // case it was not up when the page loaded.
+  useEffect(() => {
+    fetch(`${BRIDGE_HTTP_URL}/dash/layout`, { signal: AbortSignal.timeout(3000) })
+      .then((r) => (r.ok ? (r.json() as Promise<{ readouts?: Offsets }>) : null))
+      .then((saved) => {
+        if (!saved) return
+        const readouts = saved.readouts ?? {}
+        setDefaults(readouts)
+        // A browser with no arrangement of its own starts from the default.
+        if (!ownLayout.current) setOffsets(readouts)
+      })
+      .catch(() => {})
+  }, [offline])
 
   // A smaller window must not strand a readout off screen.
   useEffect(() => {
@@ -349,6 +402,7 @@ export function Dash() {
     read('/dash/personal', s.setPersonal)
     read('/dash/vitals', s.setVitals)
     read('/dash/conditions', s.setConditions)
+    read('/dash/spotify', s.setNowPlaying)
   }, [offline])
 
   const memPct = stats ? Math.round((100 * stats.memory.used) / stats.memory.total) : 0
@@ -434,6 +488,19 @@ export function Dash() {
           <div className="dash-slot dash-reactor" data-slot="reactor" />
           <div className="dash-core-foot">
             <VoiceMeter />
+            {/* Under the orb, as its name is above it: the flanks have no room
+                left at common heights, and here it takes its height from the
+                reactor's slot, which the orb is fitted to. */}
+            <section
+              className="dash-block dash-np-block"
+              data-anchor="music"
+              data-drag
+              style={place('music')}
+              title={MOVE_HINT}
+            >
+              <h3 className="dash-title">Now playing</h3>
+              <NowPlayingReadout np={nowPlaying} />
+            </section>
           </div>
         </div>
 
@@ -485,11 +552,35 @@ export function Dash() {
         <div className="dash-convo" data-slot="convo">
           <div className="dash-convo-head">
             <h3 className="dash-title">Conversation</h3>
-            {Object.keys(offsets).length > 0 && (
-              <button type="button" className="dash-reset" onClick={() => commit(() => ({}))}>
-                Reset readouts
+            {!sameOffsets(offsets, defaults) ? (
+              <>
+                <button
+                  type="button"
+                  className="dash-reset"
+                  title="Make this arrangement the one Reset returns to, in any browser"
+                  onClick={saveDefault}
+                >
+                  Save as default
+                </button>
+                <button
+                  type="button"
+                  className="dash-reset"
+                  title="Put every readout back where the default has it"
+                  onClick={() => commit(() => ({ ...defaults }))}
+                >
+                  Reset readouts
+                </button>
+              </>
+            ) : Object.keys(defaults).length > 0 ? (
+              <button
+                type="button"
+                className="dash-reset"
+                title="The arrangement JARVIS came with. Save as default keeps it."
+                onClick={() => commit(() => ({}))}
+              >
+                Original layout
               </button>
-            )}
+            ) : null}
             <span className="dash-hint">hold Space to talk · Enter to type</span>
           </div>
           <Conversation />
@@ -615,7 +706,7 @@ function Traces() {
           flow(ax, above ? a.b + 6 : a.t - 6, [0, above ? -1 : 1])
         }
       }
-      for (const name of ['cpu', 'traffic', 'mem', 'today', 'inbox', 'vitals', 'threat', 'weather', 'machine', 'link']) {
+      for (const name of ['cpu', 'traffic', 'mem', 'today', 'inbox', 'vitals', 'threat', 'weather', 'machine', 'link', 'music']) {
         toward(name)
       }
 
@@ -1055,6 +1146,127 @@ function Weather({ conditions }: { conditions: Conditions | null }) {
         </div>
       </dl>
       <span className="dash-source">Weather data by Open-Meteo.com</span>
+    </>
+  )
+}
+
+const EMPTY_TRACK: NowPlaying = {
+  at: 0,
+  error: null,
+  reading: false,
+  source: null,
+  playing: false,
+  title: '',
+  artist: '',
+  album: '',
+  art: null,
+  progressMs: null,
+  durationMs: null,
+  url: null,
+}
+
+/** Remote pictures come through the bridge, as the media hub's do. */
+const viaBridge = (url: string) => `${BRIDGE_HTTP_URL}/img?url=${encodeURIComponent(url)}`
+const mmss = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor((ms % 60_000) / 1000)).padStart(2, '0')}`
+
+/** Ask Spotify what is playing — the tile's own click, never a timer. */
+function readSpotify() {
+  const s = useStore.getState()
+  s.setNowPlaying({ ...(s.nowPlaying ?? EMPTY_TRACK), reading: true, error: null })
+  fetch(`${BRIDGE_HTTP_URL}/dash/spotify`, { method: 'POST', signal: AbortSignal.timeout(60_000) })
+    .then((r) => (r.ok ? (r.json() as Promise<{ data?: NowPlaying }>) : Promise.reject(new Error(String(r.status)))))
+    .then((p) => p.data && useStore.getState().setNowPlaying(p.data))
+    .catch(() => {
+      const n = useStore.getState().nowPlaying
+      useStore.getState().setNowPlaying({ ...(n ?? EMPTY_TRACK), reading: false, error: 'Spotify could not be read.' })
+    })
+}
+
+/**
+ * The last thing Spotify said was playing: the cover, the track, the artist
+ * and how far through, carried forward on the page's own clock while it
+ * plays. Read only when asked — ↻ here, or "what's playing?" to JARVIS.
+ */
+function NowPlayingReadout({ np }: { np: NowPlaying | null }) {
+  const [now, setNow] = useState(() => Date.now())
+  const live = Boolean(np?.playing && np.durationMs && np.progressMs != null)
+  useEffect(() => {
+    if (!live) return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [live])
+
+  const refresh = (
+    <button
+      type="button"
+      className="dash-np-read"
+      title="Ask Spotify what's playing"
+      aria-label="Ask Spotify what's playing"
+      disabled={np?.reading}
+      onClick={readSpotify}
+    >
+      ↻
+    </button>
+  )
+
+  if (!np?.at) {
+    return (
+      <div className="dash-np">
+        <p className="dash-empty dash-np-text">{np?.reading ? 'Asking Spotify…' : "Ask what's playing"}</p>
+        {refresh}
+      </div>
+    )
+  }
+  const read = new Date(np.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (np.error || !np.title) {
+    return (
+      <div className="dash-np">
+        <p className="dash-empty dash-np-text">{np.error ?? `Nothing playing · ${read}`}</p>
+        {refresh}
+      </div>
+    )
+  }
+
+  // Never backwards: the clock only ticks while a song plays, so a fresh read
+  // can land before the next tick and briefly look older than `now`.
+  const since = live ? Math.max(0, now - np.at) : 0
+  const elapsed = np.progressMs != null ? np.progressMs + since : null
+  const ended = Boolean(live && np.durationMs && elapsed != null && elapsed > np.durationMs + 2000)
+  const shown = elapsed != null && np.durationMs ? Math.min(elapsed, np.durationMs) : elapsed
+  const where = ended
+    ? 'ended · read again'
+    : !np.playing
+      ? 'paused'
+      : shown != null && np.durationMs
+        ? `${mmss(shown)} / ${mmss(np.durationMs)}`
+        : ''
+  return (
+    <>
+      <div
+        className="dash-np"
+        title={`${np.title} — ${np.artist}${np.album ? ` · ${np.album}` : ''}\nRead from Spotify at ${read}${np.source === 'voice' ? ', when you asked JARVIS' : ''}`}
+      >
+        {np.art ? <img className="dash-np-art" src={viaBridge(np.art)} alt="" /> : <span className="dash-np-art" aria-hidden />}
+        <span className="dash-np-text">
+          {np.url ? (
+            <a href={np.url} target="_blank" rel="noreferrer">
+              {np.title}
+            </a>
+          ) : (
+            <b>{np.title}</b>
+          )}
+          <small>
+            {np.artist}
+            {where ? ` · ${where}` : ''}
+          </small>
+        </span>
+        {refresh}
+      </div>
+      {np.durationMs && shown != null ? (
+        <span className="dash-np-bar" aria-hidden>
+          <i style={{ transform: `scaleX(${Math.min(1, shown / np.durationMs)})` }} />
+        </span>
+      ) : null}
     </>
   )
 }

@@ -30,6 +30,25 @@ export type Vitals = {
   notes: { hrv: string | null; stress: string | null; sleep: string | null; activities: string | null }
 }
 
+/** What Spotify last said was playing (spotify.mjs): read when the tile is
+ *  clicked or JARVIS is asked, never on a timer. An empty title with no
+ *  error means nothing was playing. */
+export type NowPlaying = {
+  at: number
+  error: string | null
+  reading: boolean
+  /** Who asked: the tile's click or a question to JARVIS. */
+  source: 'tile' | 'voice' | null
+  playing: boolean
+  title: string
+  artist: string
+  album: string
+  art: string | null
+  progressMs: number | null
+  durationMs: number | null
+  url: string | null
+}
+
 /** The weather, the air and the threat level at home (conditions.mjs).
  *  Celsius, km/h and km; the dash converts for the locale. */
 export type Conditions = {
@@ -329,6 +348,7 @@ type State = {
   } | null
   vitals: Vitals | null
   conditions: Conditions | null
+  nowPlaying: NowPlaying | null
   /** Transient status line during boot, e.g. the voice model download. */
   bootNote: string
   /** Cards currently on the display, newest last. */
@@ -355,6 +375,7 @@ type State = {
   setPersonal: (personal: State['personal']) => void
   setVitals: (vitals: Vitals | null) => void
   setConditions: (conditions: Conditions | null) => void
+  setNowPlaying: (nowPlaying: NowPlaying | null) => void
   setBootNote: (n: string) => void
   pushPanel: (p: Panel) => void
   clearPanels: () => void
@@ -419,6 +440,7 @@ export const useStore = create<State>((set) => ({
   personal: null,
   vitals: null,
   conditions: null,
+  nowPlaying: null,
   panels: [],
   blades: [],
   focusedBlade: null,
@@ -447,6 +469,7 @@ export const useStore = create<State>((set) => ({
   setPersonal: (personal) => set({ personal }),
   setVitals: (vitals) => set({ vitals }),
   setConditions: (conditions) => set({ conditions }),
+  setNowPlaying: (nowPlaying) => set({ nowPlaying }),
   setBootNote: (bootNote) => set({ bootNote }),
   // Three is as many as fits around the reactor without crowding it. Sticky
   // panels are exempt from the cull — the tool description promises they stay
