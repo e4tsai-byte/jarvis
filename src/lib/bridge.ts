@@ -162,7 +162,7 @@ export function watchWatchlist(fn: (data: unknown) => void) {
 
 /** Something the bridge thinks is worth saying unprompted (alerts.mjs). */
 export type Nudge = {
-  kind: 'calendar' | 'market' | 'news' | 'quake' | 'briefing'
+  kind: 'calendar' | 'market' | 'news' | 'quake' | 'threat' | 'briefing'
   /** The sentence to say — everything but the briefing. */
   text?: string
   /** The briefing's prompt, for a real turn. */

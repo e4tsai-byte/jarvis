@@ -479,6 +479,24 @@
   white-space: nowrap;
 }
 .dash-threat-why small { opacity: 0.55; }
+/* With the globe linked, a line is a button that flies it there: the text
+   stays as it was, and takes the level's colour under the pointer. */
+.dash-threat-go {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dash-threat-go:hover { color: var(--level); }
 .dash-threat.is-calm .dash-threat-why li { opacity: 0.6; }
 .dash-threat.is-alert b { animation: threat-alert 1.6s ease-in-out infinite; }
 @keyframes threat-alert {

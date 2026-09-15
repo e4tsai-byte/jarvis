@@ -105,7 +105,7 @@ async function quakesNear(home) {
   return (d?.features ?? [])
     .map((f) => {
       const [lon, lat] = f.geometry?.coordinates ?? []
-      return { mag: f.properties?.mag, km: kmBetween(home, { lat, lon }) }
+      return { mag: f.properties?.mag, km: kmBetween(home, { lat, lon }), lat, lon }
     })
     .filter((q) => typeof q.mag === 'number' && Number.isFinite(q.km) && q.km <= 1000)
 }
@@ -131,18 +131,26 @@ async function firesNear(home, key) {
   if (!cols.includes('latitude')) throw new Error('FIRMS did not answer with CSV')
   const col = (row, name) => row[cols.indexOf(name)]
   const now = Date.now()
-  const km = []
+  const spots = []
   for (const line of rows) {
     const r = line.split(',')
     if (col(r, 'confidence') === 'l') continue
     const hhmm = String(col(r, 'acq_time') ?? '').padStart(4, '0')
     const t = Date.parse(`${col(r, 'acq_date')}T${hhmm.slice(0, 2)}:${hhmm.slice(2)}:00Z`)
     if (!Number.isFinite(t) || now - t > 86_400_000) continue
-    const k = kmBetween(home, { lat: Number(col(r, 'latitude')), lon: Number(col(r, 'longitude')) })
-    if (Number.isFinite(k)) km.push(k)
+    const at = { lat: Number(col(r, 'latitude')), lon: Number(col(r, 'longitude')) }
+    const km = kmBetween(home, at)
+    if (Number.isFinite(km)) spots.push({ km, ...at })
   }
-  const within = (d) => km.filter((k) => k <= d).length
-  return { within10: within(10), within25: within(25), within50: within(50), nearest: km.length ? Math.min(...km) : null }
+  const within = (d) => spots.filter((s) => s.km <= d).length
+  const nearest = spots.reduce((a, s) => (!a || s.km < a.km ? s : a), null)
+  return {
+    within10: within(10),
+    within25: within(25),
+    within50: within(50),
+    nearest: nearest?.km ?? null,
+    at: nearest && { lat: nearest.lat, lon: nearest.lon },
+  }
 }
 
 /** Open wildfires and storms — tropical cyclones among them — that NASA's
@@ -161,6 +169,8 @@ async function eventsNear(home) {
       title: String(e.title ?? '').slice(0, 80),
       kind: e.categories?.some((c) => c.id === 'severeStorms') ? 'storm' : 'fire',
       km: kmBetween(home, { lat, lon }),
+      lat,
+      lon,
     })
   }
   return out
@@ -190,37 +200,44 @@ async function warningsAt(home) {
  *   GUARDED   a felt quake, a storm within 1,500 km, fires within 50 km, a
  *             moderate warning, heavy rain or snow, dangerous heat, bad air
  */
-export function assess({ weather, air, quakes, fires, events, warnings }) {
+export function assess({ weather, air, quakes, fires, events, warnings, home = null }) {
   const reasons = []
-  const add = (level, text, km = null) => {
-    if (level > 0) reasons.push({ level, text, km: km === null ? null : Math.round(km) })
+  // Each reason says what kind of hazard it is — the alerts phrase each kind
+  // their own way — and where the globe should look: its own place when it
+  // has one, home for the weather, a warning or the air.
+  const add = (level, text, kind, { km = null, at = home } = {}) => {
+    if (level <= 0) return
+    const round = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null)
+    reasons.push({ level, text, kind, km: km === null ? null : Math.round(km), lat: round(at?.lat), lon: round(at?.lon) })
   }
   for (const q of quakes ?? []) {
     const level =
       (q.mag >= 6 && q.km <= 300) || q.mag >= 7 ? 3 : (q.mag >= 5 && q.km <= 300) || q.mag >= 6 ? 2 : (q.mag >= 4 && q.km <= 200) || q.mag >= 5 ? 1 : 0
-    add(level, `M${q.mag.toFixed(1)} earthquake`, q.km)
+    add(level, `M${q.mag.toFixed(1)} earthquake`, 'quake', { km: q.km, at: q })
   }
   if (fires) {
     const level = fires.within10 >= 5 ? 3 : fires.within25 >= 5 || fires.within10 >= 2 ? 2 : fires.within50 >= 3 ? 1 : 0
-    add(level, `${fires.within50} fire hotspots`, fires.nearest)
+    add(level, `${fires.within50} fire hotspots`, 'hotspots', { km: fires.nearest, at: fires.at })
   }
   for (const e of events ?? []) {
     const level =
       e.kind === 'storm' ? (e.km <= 300 ? 3 : e.km <= 800 ? 2 : e.km <= 1500 ? 1 : 0) : e.km <= 50 ? 2 : e.km <= 150 ? 1 : 0
-    add(level, e.title, e.km)
+    add(level, e.title, e.kind === 'storm' ? 'storm' : 'wildfire', { km: e.km, at: e })
   }
-  for (const w of warnings ?? []) add({ Extreme: 3, Severe: 2, Moderate: 1 }[w.severity] ?? 0, w.event)
+  for (const w of warnings ?? []) add({ Extreme: 3, Severe: 2, Moderate: 1 }[w.severity] ?? 0, w.event, 'warning')
   if (weather) {
-    if ([95, 96, 99].includes(weather.code)) add(2, weather.condition)
-    else if ([65, 67, 75, 82, 86].includes(weather.code)) add(1, weather.condition)
-    if (weather.gusts >= 90) add(2, 'Damaging gusts')
-    else if (weather.gusts >= 62) add(1, 'Strong gusts')
+    if ([95, 96, 99].includes(weather.code)) add(2, weather.condition, 'weather')
+    else if ([65, 67, 75, 82, 86].includes(weather.code)) add(1, weather.condition, 'weather')
+    if (weather.gusts >= 90) add(2, 'Damaging gusts', 'weather')
+    else if (weather.gusts >= 62) add(1, 'Strong gusts', 'weather')
     // The heat index bands: "danger" from 39°C, "extreme danger" from 51°C.
-    if (weather.feels >= 51) add(2, 'Extreme heat')
-    else if (weather.feels >= 39) add(1, 'Dangerous heat')
-    if (weather.feels <= -25) add(2, 'Extreme cold')
+    if (weather.feels >= 51) add(2, 'Extreme heat', 'weather')
+    else if (weather.feels >= 39) add(1, 'Dangerous heat', 'weather')
+    if (weather.feels <= -25) add(2, 'Extreme cold', 'weather')
   }
-  if (air) add(air.aqi > 300 ? 3 : air.aqi > 200 ? 2 : air.aqi > 150 ? 1 : 0, `Air quality ${air.category.toLowerCase()}`)
+  if (air) {
+    add(air.aqi > 300 ? 3 : air.aqi > 200 ? 2 : air.aqi > 150 ? 1 : 0, `Air quality ${air.category.toLowerCase()}`, 'air')
+  }
   reasons.sort((a, b) => b.level - a.level || (a.km ?? 0) - (b.km ?? 0))
   const level = reasons[0]?.level ?? 0
   return { level, label: LEVELS[level], reasons: reasons.slice(0, 3) }
@@ -270,7 +287,7 @@ export function createConditions({ home }) {
         home: { name: h.name },
         weather: got.weather ?? null,
         air: got.air ?? null,
-        threat: hazardsRead ? { ...assess(got), sources, missing } : null,
+        threat: hazardsRead ? { ...assess({ ...got, home: h }), sources, missing } : null,
       }
       if (missing.length) console.warn(`[jarvis] conditions: ${missing.join(', ')} could not be read`)
     } catch (err) {

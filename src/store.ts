@@ -49,7 +49,9 @@ export type Conditions = {
   threat: {
     level: 0 | 1 | 2 | 3
     label: string
-    reasons: { level: number; text: string; km: number | null }[]
+    /** kind: quake, hotspots, storm, wildfire, warning, weather or air.
+     *  lat/lon: where the globe should look for it. */
+    reasons: { level: number; text: string; kind: string; km: number | null; lat: number | null; lon: number | null }[]
     sources: string[]
     /** Feeds that could not be read this time. */
     missing: string[]

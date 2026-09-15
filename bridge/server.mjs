@@ -772,6 +772,43 @@ const handleRequest = async (req, res) => {
     return res.end(JSON.stringify(saved))
   }
 
+  // The threat level's "show me": fly the globe to a hazard. It moves
+  // something on the user's screen, so it asks what the watchlist asks — a
+  // trusted Origin, present. Coordinates in; the flight is GEV's own tool.
+  if (req.method === 'POST' && req.url === '/dash/world/fly') {
+    const json = (status, body) => {
+      res.writeHead(status, { ...cors, 'content-type': 'application/json', 'cache-control': 'no-store' })
+      return res.end(JSON.stringify(body))
+    }
+    if (!origin) return json(403, { error: 'forbidden' })
+    let body = ''
+    for await (const chunk of req) {
+      body += chunk
+      if (body.length > 1024) return json(413, { error: 'too large' })
+    }
+    let at
+    try {
+      at = JSON.parse(body)
+    } catch {
+      return json(400, { error: 'not json' })
+    }
+    const lat = Number(at?.lat)
+    const lon = Number(at?.lon)
+    if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) return json(400, { error: 'not a coordinate' })
+    const rangeM = Math.min(20_000_000, Math.max(1000, Number(at?.rangeM) || 300_000))
+    if (!WORLD_TOOLS || !worldLink.connected) return json(409, { error: 'the world view is not linked' })
+    try {
+      const reply = await worldLink.request('run', {
+        name: 'fly_to_location',
+        args: { latitude: lat, longitude: lon, rangeM },
+      })
+      const result = reply.result ?? { ok: false }
+      return json(result.ok === false ? 502 : 200, result)
+    } catch (err) {
+      return json(502, { error: String(err?.message ?? err) })
+    }
+  }
+
   // The dashboard's data (dash.mjs). JSON only, under the same origin rules as
   // everything else here; every upstream fetch happens server-side.
   if (req.method === 'GET' && req.url?.startsWith('/dash/')) {
@@ -1135,13 +1172,15 @@ const watchlist = createWatchlist()
 // speak first (memory.mjs, alerts.mjs).
 const memory = createMemory()
 const thread = createThread()
-const alerts = createAlerts({ personal, watchlist, market, headlines })
-alerts.start()
 // Your vitals, and the weather and threat level at home — the same home the
-// earthquake alerts use (vitals.mjs, conditions.mjs).
+// earthquake alerts use (vitals.mjs, conditions.mjs). The briefing reads
+// both, and a hazard that lifts the threat level is said like any alert.
 const vitals = createVitals()
 vitals.start()
+const alerts = createAlerts({ personal, watchlist, market, headlines, vitals })
+alerts.start()
 const conditions = createConditions({ home: () => alerts.home() })
+alerts.watchConditions(conditions)
 conditions.start()
 
 const wss = new WebSocketServer({
@@ -1237,8 +1276,8 @@ const MEMORY_RULES = `MEMORY. You remember the user between conversations.
 - What you remember is background. Use it where it helps; never recite it.
 
 SPEAKING FIRST. The interface speaks up on its own — a calendar event about to
-start, a big watchlist move, news on a topic they follow, an earthquake near
-home — and asks you for a morning briefing. A message marked "[Scheduled"
+start, a big watchlist move, news on a topic they follow, an earthquake or
+another hazard near home — and asks you for a morning briefing. A message marked "[Scheduled"
 comes from it, not from them: answer it as the briefing itself, four spoken
 sentences at most. A note in brackets at the start of a question is something
 you already said unprompted; they may be answering it. alerts_set,

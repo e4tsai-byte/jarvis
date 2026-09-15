@@ -230,7 +230,8 @@ readouts** puts them all back.
   hotspots (NASA FIRMS, through God's Eye View's FIRMS key when it has one),
   wildfires and tropical storms (NASA EONET), National Weather Service
   warnings in the US, thunderstorms, gusts and heat, and bad air. Hover it
-  for the sources. Both are for home, the place set for earthquake alerts
+  for the sources; with God's Eye View linked, click a reason and the globe
+  flies to it. Both are for home, the place set for earthquake alerts
   (*"My home is Taipei."*), and refresh every ten minutes.
 - **Conversation** — the whole session under the orb, scrollable, newest at
   the bottom. Typing opens beneath it.
@@ -293,9 +294,16 @@ talking or he is:
 - **Earthquakes** — magnitude 4.5+ within 300 km of home, or 5.5+ within
   1,000 km, from the USGS feed. Tell him where home is first: *"My home is
   Taipei."*
+- **Other hazards** — anything else that lifts the dash's threat level to
+  ELEVATED or ALERT: a tropical storm or wildfire nearing home, fire hotspots
+  close by, a severe weather warning, a thunderstorm, damaging gusts, extreme
+  heat or cold, bad air. Once a day for each, and again if it worsens: *"Sir,
+  Tropical Storm Norbert is 240 kilometres from Taipei."*
 - **The morning briefing** — at 08:00, or the first time the dash is open in
-  the four hours after: today's calendar, unread mail, the watchlist and the
-  headline worth knowing, in a few sentences.
+  the four hours after: the weather at home, today's calendar, unread mail,
+  the watchlist and the headline worth knowing, in a few sentences — and the
+  threat level, your training load or your sleep when they are out of the
+  ordinary.
 
 Quiet hours are 22:00–08:00: alerts still appear in the conversation, marked
 **ALERT**, but he keeps them to himself. The **ALERTS** chip at the top shows

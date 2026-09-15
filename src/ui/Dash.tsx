@@ -214,6 +214,9 @@ export function Dash() {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return
+    // A button inside a readout is pressed, not dragged: capturing the pointer
+    // here would take its click.
+    if ((e.target as HTMLElement).closest('button, a')) return
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-drag]')
     const name = el?.dataset.anchor
     if (!el || !name) return
@@ -437,7 +440,7 @@ export function Dash() {
         <aside className="dash-flank dash-flank-right">
           <section className="dash-block" data-anchor="threat" data-drag style={place('threat')} title={MOVE_HINT}>
             <h3 className="dash-title">Threat level</h3>
-            <Threat conditions={conditions} />
+            <Threat conditions={conditions} linked={world === true} />
           </section>
           <section className="dash-block" data-anchor="weather" data-drag style={place('weather')} title={MOVE_HINT}>
             <h3 className="dash-title">Weather{conditions?.home ? ` · ${conditions.home.name.split(',')[0]}` : ''}</h3>
@@ -917,8 +920,30 @@ function VitalsReadout({ vitals }: { vitals: Vitals | null }) {
 
 const THREAT_CLASS = ['calm', 'guarded', 'elevated', 'alert']
 
+type Reason = NonNullable<Conditions['threat']>['reasons'][number]
+
+/** Camera range, in metres, that frames each kind of hazard. */
+const FRAME_M: Record<string, number> = { storm: 2_500_000, quake: 600_000, wildfire: 120_000, hotspots: 150_000 }
+
+/** Bring the globe forward and fly it to a hazard. The layout switches at
+ *  once, so the flight is watched rather than waited for. */
+function showOnGlobe(r: Reason) {
+  const s = useStore.getState()
+  s.setLayout('world')
+  fetch(`${BRIDGE_HTTP_URL}/dash/world/fly`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ lat: r.lat, lon: r.lon, rangeM: FRAME_M[r.kind] ?? 250_000 }),
+    signal: AbortSignal.timeout(50_000),
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error(String(res.status))
+    })
+    .catch(() => s.setError('The globe could not be moved there.'))
+}
+
 /** Calm to alert, as a word and four segments, with what is behind it. */
-function Threat({ conditions }: { conditions: Conditions | null }) {
+function Threat({ conditions, linked }: { conditions: Conditions | null; linked: boolean }) {
   if (!conditions) return <p className="dash-empty">Assessing…</p>
   if (!conditions.home) return <p className="dash-empty">Tell me where home is: “My home is Taipei.”</p>
   const t = conditions.threat
@@ -927,7 +952,8 @@ function Threat({ conditions }: { conditions: Conditions | null }) {
     `Earthquakes, fires, storms, weather warnings and air near ${conditions.home.name}.\n` +
     t.reasons.map((r) => `${r.text}${r.km != null ? ` · ${distance(r.km)}` : ''}\n`).join('') +
     `Sources: ${t.sources.join(', ')}` +
-    (t.missing.length ? `\nNot read this time: ${t.missing.join(', ')}` : '')
+    (t.missing.length ? `\nNot read this time: ${t.missing.join(', ')}` : '') +
+    (linked && t.reasons.length ? '\nClick a line to see it on the globe.' : '')
   return (
     <div className={`dash-threat is-${THREAT_CLASS[t.level]}`} title={about}>
       <div className="dash-threat-head">
@@ -945,8 +971,17 @@ function Threat({ conditions }: { conditions: Conditions | null }) {
           // Two lines at most; the tooltip lists them all.
           t.reasons.slice(0, 2).map((r) => (
             <li key={r.text}>
-              {r.text}
-              {r.km != null && <small> · {distance(r.km)}</small>}
+              {linked && r.lat != null && r.lon != null ? (
+                <button type="button" className="dash-threat-go" title="Show it on the globe" onClick={() => showOnGlobe(r)}>
+                  {r.text}
+                  {r.km != null && <small> · {distance(r.km)}</small>}
+                </button>
+              ) : (
+                <>
+                  {r.text}
+                  {r.km != null && <small> · {distance(r.km)}</small>}
+                </>
+              )}
             </li>
           ))
         )}
