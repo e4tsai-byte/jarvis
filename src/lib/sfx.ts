@@ -6,14 +6,14 @@
  * licence to worry about, a few hundred bytes instead of a few megabytes.
  *
  * To use real recordings instead, drop matching files into `public/audio/`
- * (boot.mp3, wake.mp3, listen.mp3, tool.mp3, done.mp3, error.mp3) and they take
+ * (boot.mp3, wake.mp3, listen.mp3, tool.mp3, done.mp3, error.mp3, timer.mp3) and they take
  * over automatically. Pixabay's sci-fi UI and HUD packs are the usual source —
  * CC0, no attribution, safe on a monetised channel. `ambient.mp3` is not one of
  * these: the looping bed is music.ts's, and the oscillator pair at the bottom of
  * this file is only the fallback for when that file isn't there.
  */
 
-type Cue = 'boot' | 'wake' | 'listen' | 'tool' | 'done' | 'error'
+type Cue = 'boot' | 'wake' | 'listen' | 'tool' | 'done' | 'error' | 'timer'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -79,7 +79,7 @@ export async function unlockAudio(): Promise<void> {
 
 /** Pick up any real audio files the user has dropped into public/audio/. */
 async function loadOverrides() {
-  const cues: Cue[] = ['boot', 'wake', 'listen', 'tool', 'done', 'error']
+  const cues: Cue[] = ['boot', 'wake', 'listen', 'tool', 'done', 'error', 'timer']
   await Promise.all(
     cues.map(async (cue) => {
       if (samples.has(cue)) return
@@ -199,6 +199,16 @@ const synth: Record<Cue, () => void> = {
   error: () => {
     blip(320, { dur: 0.18, type: 'square', gain: 0.14 })
     blip(226, { at: 0.13, dur: 0.3, type: 'square', gain: 0.12 })
+  },
+
+  /** A timer is up: a rising three-note chime, twice, so it carries across a
+   *  room — the one cue meant to be noticed from somewhere else. */
+  timer: () => {
+    for (const at of [0, 0.55]) {
+      blip(880, { at, dur: 0.16, gain: 0.2 })
+      blip(1109, { at: at + 0.14, dur: 0.16, gain: 0.2 })
+      blip(1319, { at: at + 0.28, dur: 0.26, gain: 0.22 })
+    }
   },
 }
 

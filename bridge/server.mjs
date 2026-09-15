@@ -47,6 +47,7 @@ import { alertsServer, createAlerts } from './alerts.mjs'
 import { createVitals } from './vitals.mjs'
 import { createConditions, statusServer } from './conditions.mjs'
 import { CONTROL_ACTIONS, createNowPlaying, musicServer } from './music.mjs'
+import { createTimers, timersServer } from './timers.mjs'
 import { routeTurn } from './router.mjs'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
@@ -339,6 +340,9 @@ function decideTool(name) {
     // Music in the Spotify app on this Mac (music.mjs): it plays on the
     // user's own speakers, as the media hub does, and changes nothing else.
     if (server === 'jarvis_music') return true
+
+    // Timers and reminders, kept in ~/.jarvis and said out loud (timers.mjs).
+    if (server === 'jarvis_timers') return true
 
     const tool = mcpToolOf(name)
     if (EFFECTFUL_VERB.test(tool) && !VETO_EXEMPT.has(`${server}__${tool}`)) {
@@ -1253,6 +1257,8 @@ conditions.start()
 // The Spotify app on this Mac: followed live while a window is open, and
 // driven from the tile and by voice (music.mjs).
 const nowPlaying = createNowPlaying()
+// Timers and reminders, said out loud when due (timers.mjs).
+const timers = createTimers()
 
 const wss = new WebSocketServer({
   server,
@@ -1348,7 +1354,7 @@ const MEMORY_RULES = `MEMORY. You remember the user between conversations.
 
 SPEAKING FIRST. The interface speaks up on its own — a calendar event about to
 start, a big watchlist move, news on a topic they follow, an earthquake or
-another hazard near home — and asks you for a morning briefing. A message marked "[Scheduled"
+another hazard near home, a timer they set — and asks you for a morning briefing. A message marked "[Scheduled"
 comes from it, not from them: answer it as the briefing itself, four spoken
 sentences at most. A note in brackets at the start of a question is something
 you already said unprompted; they may be answering it. alerts_set,
@@ -1443,6 +1449,13 @@ wss.on('connection', (socket, req) => {
   if (nowPlaying.get()) send({ type: 'spotify', data: nowPlaying.get() })
   const offSpotify = nowPlaying.onChange((data) => send({ type: 'spotify', data }))
   const unwatchSpotify = nowPlaying.watch()
+
+  // Timers: the list for the dash's chip, now and on every change, and each
+  // one as a nudge to say when it is due — including any that went off while
+  // no window was open.
+  send({ type: 'timers', data: timers.list() })
+  const offTimerList = timers.onChange((data) => send({ type: 'timers', data }))
+  const offTimers = timers.onFire((nudge) => send({ type: 'nudge', nudge }))
 
   // The watchlist and the hub's range: now, then on every change — from this
   // face, another one, or JARVIS's voice.
@@ -1644,6 +1657,8 @@ wss.on('connection', (socket, req) => {
         // Music in the Spotify app on this Mac: what's playing, play, pause,
         // skip and volume. The tile follows whatever these change.
         jarvis_music: musicServer(nowPlaying),
+        // Timers and reminders, said out loud when due.
+        jarvis_timers: timersServer(timers),
       },
       // A plain system prompt, not the claude_code preset. The preset is
       // tuned for a coding agent — verbose, file-oriented, and a large chunk
@@ -1937,6 +1952,8 @@ wss.on('connection', (socket, req) => {
     offConditions()
     offSpotify()
     unwatchSpotify()
+    offTimerList()
+    offTimers()
     offWatchlist()
     offNudge()
     offAlerts()

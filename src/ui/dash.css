@@ -78,7 +78,20 @@
   font-size: 9px;
   letter-spacing: 0.2em;
   opacity: 0.45;
+  /* One line always: a bar too narrow for every chip shortens them with an
+     ellipsis rather than folding each onto two lines. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+/* A full bar — five chips, which a running timer makes — packs a little
+   tighter, and the clock keeps only the time. */
+.dash-top:has(> .dash-chip:nth-of-type(5)) .dash-chip {
+  padding: 4px 6px;
+  letter-spacing: 0.12em;
+}
+.dash-top:has(> .dash-chip:nth-of-type(5)) .dash-clock-date { display: none; }
 .dash-chip.on {
   opacity: 1;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -90,10 +103,12 @@
 }
 
 .dash-clock {
+  flex: none;
   margin-left: 12px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------ JARVIS's half */

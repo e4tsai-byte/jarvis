@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useStore, accentFor, type Conditions, type Vitals } from '../store'
+import { useStore, accentFor, type Conditions, type Timer, type Vitals } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
 import { statusText } from './status'
 import { MediaHub } from './MediaHub'
@@ -201,6 +201,7 @@ export function Dash() {
   const connected = useStore((s) => s.connected)
   const personal = useStore((s) => s.personal)
   const alerts = useStore((s) => s.alerts)
+  const timers = useStore((s) => s.timers)
   const vitals = useStore((s) => s.vitals)
   const conditions = useStore((s) => s.conditions)
   const nowPlaying = useStore((s) => s.nowPlaying)
@@ -426,6 +427,7 @@ export function Dash() {
         <span className={`dash-chip${phase === 'listening' ? ' on hot' : ''}`}>
           MIC · {phase === 'listening' ? 'OPEN' : 'CLOSED'}
         </span>
+        {timers.length > 0 && <TimerChip timers={timers} />}
         {alerts && (
           <span
             className={`dash-chip${alerts.enabled && !alerts.quiet ? ' on' : ''}`}
@@ -435,8 +437,11 @@ export function Dash() {
           </span>
         )}
         <time className="dash-clock">
-          {clock.toLocaleDateString([], { month: 'short', day: 'numeric' })}
-          {' · '}
+          {/* The date gives way when the bar is full; the time never does. */}
+          <span className="dash-clock-date">
+            {clock.toLocaleDateString([], { month: 'short', day: 'numeric' })}
+            {' · '}
+          </span>
           {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </time>
       </header>
@@ -610,6 +615,31 @@ export function Dash() {
         <MediaHub />
       </div>
     </div>
+  )
+}
+
+/** The soonest timer, counting down; every one running is in its tooltip.
+ *  Ticks only while there is a timer to show. */
+function TimerChip({ timers }: { timers: Timer[] }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  const next = timers[0]
+  const left = Math.max(0, Math.ceil((next.due - now) / 1000))
+  const two = (n: number) => String(n).padStart(2, '0')
+  const clock =
+    left >= 3600
+      ? `${Math.floor(left / 3600)}:${two(Math.floor((left % 3600) / 60))}:${two(left % 60)}`
+      : `${Math.floor(left / 60)}:${two(left % 60)}`
+  const name = (t: Timer) => t.label ?? (t.at ? `Reminder ${t.at}` : 'Timer')
+  const at = (t: Timer) => new Date(t.due).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return (
+    <span className="dash-chip on" title={timers.map((t) => `${name(t)} — ${at(t)}`).join('\n')}>
+      {(next.label ?? (next.at ? 'Reminder' : 'Timer')).slice(0, 14)} · {clock}
+      {timers.length > 1 ? ` +${timers.length - 1}` : ''}
+    </span>
   )
 }
 

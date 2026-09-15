@@ -152,6 +152,12 @@ let onConditions: ((data: unknown) => void) | null = null
 export function watchConditions(fn: (data: unknown) => void) {
   onConditions = fn
 }
+/** The timers and reminders running, soonest first (timers.mjs). */
+let onTimers: ((data: unknown) => void) | null = null
+export function watchTimers(fn: (data: unknown) => void) {
+  onTimers = fn
+}
+
 /** The Spotify app on this Mac, after every change the bridge sees (music.mjs). */
 let onSpotify: ((data: unknown) => void) | null = null
 export function watchSpotify(fn: (data: unknown) => void) {
@@ -167,7 +173,7 @@ export function watchWatchlist(fn: (data: unknown) => void) {
 
 /** Something the bridge thinks is worth saying unprompted (alerts.mjs). */
 export type Nudge = {
-  kind: 'calendar' | 'market' | 'news' | 'quake' | 'threat' | 'briefing'
+  kind: 'calendar' | 'market' | 'news' | 'quake' | 'threat' | 'timer' | 'briefing'
   /** The sentence to say — everything but the briefing. */
   text?: string
   /** The briefing's prompt, for a real turn. */
@@ -329,6 +335,9 @@ function dispatch(ws: WebSocket) {
       onVitals?.((msg as unknown as { data?: unknown }).data ?? null)
     } else if (msg.type === 'conditions') {
       onConditions?.((msg as unknown as { data?: unknown }).data ?? null)
+    } else if (msg.type === 'timers') {
+      const data = (msg as unknown as { data?: unknown }).data
+      onTimers?.(Array.isArray(data) ? data : [])
     } else if (msg.type === 'spotify') {
       onSpotify?.((msg as unknown as { data?: unknown }).data ?? null)
     } else if (msg.type === 'watchlist') {

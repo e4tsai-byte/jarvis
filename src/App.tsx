@@ -32,6 +32,7 @@ import {
   watchVitals,
   watchConditions,
   watchSpotify,
+  watchTimers,
   watchWatchlist,
   watchNudges,
   watchThread,
@@ -512,6 +513,8 @@ export default function App() {
     watchSpotify((data) =>
       store.getState().setNowPlaying(data as ReturnType<typeof store.getState>['nowPlaying']),
     )
+    // The timers running, for the dash's countdown chip.
+    watchTimers((data) => store.getState().setTimers(data as ReturnType<typeof store.getState>['timers']))
     // The saved watchlist and range, as the bridge holds them.
     watchWatchlist((data) =>
       store.getState().setWatchlist(data as ReturnType<typeof store.getState>['watchlist']),
@@ -679,7 +682,8 @@ export default function App() {
       silence()
       const spk = createSpeaker()
       speaker.current = spk
-      sfx.play('tool')
+      // A timer he was asked to keep gets its own chime; other alerts, the tick.
+      sfx.play(batch.some((n) => n.kind === 'timer') ? 'timer' : 'tool')
       s.setPhase('speaking')
       spk.say(text)
       void spk.end().then(() => {

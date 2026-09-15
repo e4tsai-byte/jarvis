@@ -30,6 +30,10 @@ export type Vitals = {
   notes: { hrv: string | null; stress: string | null; sleep: string | null; activities: string | null }
 }
 
+/** A timer or reminder JARVIS keeps (timers.mjs): `ms` for a timer's length,
+ *  `at` for a reminder's clock time. */
+export type Timer = { id: string; label: string | null; due: number; at: string | null; ms: number | null }
+
 /** The Spotify app on this Mac, followed live by the bridge while a window is
  *  open (music.mjs). An empty title with no error means nothing is loaded. */
 export type NowPlaying = {
@@ -349,6 +353,8 @@ type State = {
   vitals: Vitals | null
   conditions: Conditions | null
   nowPlaying: NowPlaying | null
+  /** Timers and reminders running, soonest first. */
+  timers: Timer[]
   /** Transient status line during boot, e.g. the voice model download. */
   bootNote: string
   /** Cards currently on the display, newest last. */
@@ -376,6 +382,7 @@ type State = {
   setVitals: (vitals: Vitals | null) => void
   setConditions: (conditions: Conditions | null) => void
   setNowPlaying: (nowPlaying: NowPlaying | null) => void
+  setTimers: (timers: Timer[]) => void
   setBootNote: (n: string) => void
   pushPanel: (p: Panel) => void
   clearPanels: () => void
@@ -441,6 +448,7 @@ export const useStore = create<State>((set) => ({
   vitals: null,
   conditions: null,
   nowPlaying: null,
+  timers: [],
   panels: [],
   blades: [],
   focusedBlade: null,
@@ -470,6 +478,7 @@ export const useStore = create<State>((set) => ({
   setVitals: (vitals) => set({ vitals }),
   setConditions: (conditions) => set({ conditions }),
   setNowPlaying: (nowPlaying) => set({ nowPlaying }),
+  setTimers: (timers) => set({ timers }),
   setBootNote: (bootNote) => set({ bootNote }),
   // Three is as many as fits around the reactor without crowding it. Sticky
   // panels are exempt from the cull — the tool description promises they stay

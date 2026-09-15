@@ -97,6 +97,10 @@ export function watchVitals(fn: (data: unknown) => void): void {
 export function watchConditions(fn: (data: unknown) => void): void {
   if (usingBridge) bridge.watchConditions(fn)
 }
+/** The timers and reminders running, from the bridge. */
+export function watchTimers(fn: (data: unknown) => void): void {
+  if (usingBridge) bridge.watchTimers(fn)
+}
 /** What Spotify last said was playing, from the bridge. */
 export function watchSpotify(fn: (data: unknown) => void): void {
   if (usingBridge) bridge.watchSpotify(fn)

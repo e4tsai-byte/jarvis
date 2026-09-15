@@ -316,6 +316,13 @@ talking or he is:
   close by, a severe weather warning, a thunderstorm, damaging gusts, extreme
   heat or cold, bad air. Once a day for each, and again if it worsens: *"Sir,
   Tropical Storm Norbert is 240 kilometres from Taipei."*
+- **Timers and reminders** — *"Set a timer for ten minutes."* · *"Pasta timer,
+  eight minutes."* · *"Remind me at 5:30 to call Mum."* · *"How long's left?"*
+  · *"Cancel the timer."* He keeps them on the bridge (`~/.jarvis/timers.json`)
+  and says it out loud when time's up, with a chime — through quiet hours too,
+  since you set it. The soonest one counts down on a chip at the top of the
+  dash. One that goes off with no JARVIS window open is said, late, when you
+  next open one.
 - **The morning briefing** — at 08:00, or the first time the dash is open in
   the four hours after: the weather at home, today's calendar, unread mail,
   the watchlist and the headline worth knowing, in a few sentences — and the
